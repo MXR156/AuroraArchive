@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreSourceRequest;
 use App\Jobs\ScanSource;
 use App\Models\Source;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class SourceController extends Controller
@@ -16,9 +16,10 @@ class SourceController extends Controller
         return view('sources.index', ['sources' => $request->user()->sources()->withCount('media')->latest()->get()]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(StoreSourceRequest $request): RedirectResponse
     {
-        $data = $request->validate(['type' => ['required', Rule::in(['channel', 'playlist', 'video'])], 'name' => ['required', 'string', 'max:255'], 'external_id' => ['required', 'string', 'max:255'], 'url' => ['required', 'url', 'starts_with:https://www.youtube.com/,https://youtube.com/,https://youtu.be/'], 'scan_interval_minutes' => ['required', 'integer', 'min:15', 'max:10080'], 'auto_download' => ['nullable', 'boolean']]);
+        $data = $request->validated();
+        $data['external_id'] = $request->youtubeId();
         $data['auto_download'] = $request->boolean('auto_download');
         $source = $request->user()->sources()->create($data);
         ScanSource::dispatch($source);
