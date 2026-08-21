@@ -14,7 +14,7 @@ RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --opt
 
 FROM php:8.5-fpm-bookworm
 ARG TARGETARCH
-RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor ffmpeg curl unzip procps libzip-dev libicu-dev libsqlite3-dev ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor ffmpeg curl unzip procps passwd libzip-dev libicu-dev libsqlite3-dev ca-certificates \
     && docker-php-ext-install pdo_mysql pdo_sqlite intl opcache pcntl zip \
     && case "$TARGETARCH" in amd64) YTDLP_ARCH=""; DENO_ARCH="x86_64" ;; arm64) YTDLP_ARCH="_aarch64"; DENO_ARCH="aarch64" ;; *) exit 1 ;; esac \
     && curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux${YTDLP_ARCH}" -o /usr/local/bin/yt-dlp \
@@ -24,6 +24,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends nginx superviso
     && apt-get purge -y --auto-remove unzip \
     && rm -rf /var/lib/apt/lists/* /tmp/deno.zip /var/www/html/*
 WORKDIR /var/www/html
+ENV APP_NAME=AuroraArchive \
+    APP_ENV=production \
+    APP_DEBUG=false \
+    APP_URL=http://localhost \
+    LOG_CHANNEL=stderr \
+    LOG_LEVEL=info \
+    DB_CONNECTION=sqlite \
+    DB_DATABASE=/config/auroraarchive.sqlite \
+    DB_BUSY_TIMEOUT=5000 \
+    DB_JOURNAL_MODE=WAL \
+    DB_SYNCHRONOUS=NORMAL \
+    DB_TRANSACTION_MODE=IMMEDIATE \
+    QUEUE_CONNECTION=database \
+    DB_QUEUE_RETRY_AFTER=7500 \
+    CACHE_STORE=database \
+    SESSION_DRIVER=database \
+    MEDIA_ROOT=/media \
+    AURORAARCHIVE_CONFIG_ROOT=/config \
+    TZ=Europe/London \
+    PUID=1000 \
+    PGID=1000 \
+    UMASK=002
 COPY --from=dependencies /app/vendor ./vendor
 COPY . .
 COPY --from=frontend /app/public/build ./public/build

@@ -3,29 +3,10 @@ services:
     build: .
     image: ghcr.io/mxr156/auroraarchive:latest
     restart: unless-stopped
+    stop_grace_period: 2h
     ports: ["8080:80"]
     environment:
-      APP_NAME: AuroraArchive
-      APP_ENV: production
-      APP_DEBUG: "false"
-      APP_URL: http://localhost:8080
-      APP_KEY: ${APP_KEY}
-      LOG_CHANNEL: stderr
-      DB_CONNECTION: ${DB_CONNECTION:-sqlite}
-      DB_HOST: ${DB_HOST:-}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_DATABASE: ${DB_DATABASE:-/config/auroraarchive.sqlite}
-      DB_BUSY_TIMEOUT: ${DB_BUSY_TIMEOUT:-5000}
-      DB_JOURNAL_MODE: ${DB_JOURNAL_MODE:-WAL}
-      DB_SYNCHRONOUS: ${DB_SYNCHRONOUS:-NORMAL}
-      DB_TRANSACTION_MODE: ${DB_TRANSACTION_MODE:-IMMEDIATE}
-      DB_USERNAME: ${DB_USERNAME:-}
-      DB_PASSWORD: ${DB_PASSWORD:-}
-      QUEUE_CONNECTION: database
-      DB_QUEUE_RETRY_AFTER: 7500
-      CACHE_STORE: database
-      SESSION_DRIVER: database
-      MEDIA_ROOT: /media
-      AURORAARCHIVE_CONFIG_ROOT: /config
-      TZ: Europe/London
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/London}
     volumes: ["./media:/media", "./persistent-config:/config"]
