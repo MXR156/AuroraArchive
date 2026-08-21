@@ -19,8 +19,10 @@
     </select>
     <select name="sort" class="field" aria-label="Media sort order">
         @if($playlistOrder)<option value="playlist" @selected(request('sort', 'playlist') === 'playlist')>Playlist order</option>@endif
+        @if($playlistOrder)<option value="playlist_reverse" @selected(request('sort') === 'playlist_reverse')>Reverse playlist order</option>@endif
         <option value="newest" @selected(request('sort', $playlistOrder ? 'playlist' : 'newest') === 'newest')>Newest published</option>
         <option value="oldest" @selected(request('sort') === 'oldest')>Oldest published</option>
+        <option value="recently_downloaded" @selected(request('sort') === 'recently_downloaded')>Recently downloaded</option>
         <option value="recently_added" @selected(request('sort') === 'recently_added')>Recently added</option>
         <option value="title" @selected(request('sort') === 'title')>Title A-Z</option>
         <option value="duration_longest" @selected(request('sort') === 'duration_longest')>Longest duration</option>

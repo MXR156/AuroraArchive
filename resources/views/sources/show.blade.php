@@ -25,7 +25,7 @@
                     @endforeach
                 </div>
             </form>
-            <div>{{ $media->links() }}</div>
+            <x-pagination :paginator="$media" />
         @endif
     </div>
 </x-layouts.app>

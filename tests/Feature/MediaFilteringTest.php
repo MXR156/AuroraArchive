@@ -48,6 +48,19 @@ test('the library supports status filtering and title sorting', function () {
         ->assertDontSee('Failed video');
 });
 
+test('the library can sort by the most recently downloaded file', function () {
+    $user = User::factory()->create();
+    $older = filterableMedium('AAAAAAAAAAA', 'Older download', MediaStatus::Downloaded, true);
+    $newer = filterableMedium('BBBBBBBBBBB', 'Newer download', MediaStatus::Downloaded, true);
+    $older->files()->update(['created_at' => now()->subDay()]);
+    $newer->files()->update(['created_at' => now()]);
+
+    $this->actingAs($user)
+        ->get(route('library', ['sort' => 'recently_downloaded']))
+        ->assertOk()
+        ->assertSeeInOrder(['Newer download', 'Older download']);
+});
+
 test('media filter dropdowns expose automatic submission controls', function () {
     $this->actingAs(User::factory()->create())
         ->get(route('library'))
@@ -74,6 +87,25 @@ test('playlist pages use the shared filters while retaining playlist order by de
         ->assertOk()
         ->assertSee('First item')
         ->assertDontSee('Second item');
+
+    $this->actingAs($user)->get(route('sources.show', [$source, 'sort' => 'playlist_reverse']))
+        ->assertOk()
+        ->assertSeeInOrder(['Second item', 'First item']);
+});
+
+test('library pagination shows page numbers and first and last controls', function () {
+    $user = User::factory()->create();
+    foreach (range(1, 26) as $number) {
+        filterableMedium(sprintf('VID%08d', $number), sprintf('Page item %02d', $number), MediaStatus::Skipped, false);
+    }
+
+    $this->actingAs($user)
+        ->get(route('library', ['filter' => 'skipped', 'sort' => 'title']))
+        ->assertOk()
+        ->assertSee('aria-label="Pagination"', escape: false)
+        ->assertSee('aria-label="First page"', escape: false)
+        ->assertSee('aria-label="Last page"', escape: false)
+        ->assertSee(route('library', ['filter' => 'skipped', 'sort' => 'title', 'page' => 2]));
 });
 
 test('creator pages can show only skipped media', function () {

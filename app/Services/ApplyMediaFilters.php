@@ -36,6 +36,9 @@ class ApplyMediaFilters
         if ($playlistOrder && ($sort === '' || $sort === 'playlist')) {
             return $query->orderByPivot('position')->orderBy('media.id');
         }
+        if ($playlistOrder && $sort === 'playlist_reverse') {
+            return $query->orderByPivot('position', 'desc')->orderByDesc('media.id');
+        }
 
         return match ($sort) {
             'oldest' => $query->orderBy('media.published_at')->orderBy('media.id'),
@@ -43,6 +46,7 @@ class ApplyMediaFilters
             'duration_longest' => $query->orderByDesc('media.duration_seconds')->orderBy('media.id'),
             'duration_shortest' => $query->orderBy('media.duration_seconds')->orderBy('media.id'),
             'recently_added' => $query->latest('media.created_at'),
+            'recently_downloaded' => $query->withMax('files', 'created_at')->orderByDesc('files_max_created_at')->orderByDesc('media.id'),
             default => $query->latest('media.published_at')->latest('media.id'),
         };
     }

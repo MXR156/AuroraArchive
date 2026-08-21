@@ -23,7 +23,7 @@
                     </article>
                 @endforeach
             </div>
-            <div>{{ $channels->links() }}</div>
+            <x-pagination :paginator="$channels" />
         @endif
     </div>
 </x-layouts.app>

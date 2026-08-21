@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ImportTubeSyncRequest;
+use App\Jobs\ImportTubeSyncSources;
 use App\Services\TubeSyncImporter;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,22 +27,8 @@ class TubeSyncImportController extends Controller
 
     public function store(ImportTubeSyncRequest $request): RedirectResponse
     {
-        try {
-            $summary = $this->importer->import($request->user(), $request->validated('sources'), $request->boolean('queue_missing'));
-        } catch (Throwable $exception) {
-            report($exception);
+        ImportTubeSyncSources::dispatch($request->user(), $request->validated('sources'), $request->boolean('queue_missing'));
 
-            return back()->withErrors(['tubesync' => $exception->getMessage()]);
-        }
-
-        return back()->with('success', sprintf(
-            'TubeSync import complete: %d sources, %d media, %d existing files, %d thumbnails, %d queued, %d metadata-only.',
-            $summary['sources'],
-            $summary['media'],
-            $summary['files'],
-            $summary['thumbnails'],
-            $summary['queued'],
-            $summary['metadata_only'],
-        ));
+        return back()->with('success', 'TubeSync import queued. Large playlists will continue importing in the background.');
     }
 }

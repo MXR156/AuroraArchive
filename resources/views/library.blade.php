@@ -17,7 +17,7 @@
                     @foreach($media as $medium)<x-video-card :medium="$medium" :selectable="true" />@endforeach
                 </div>
             </form>
-            <div>{{ $media->links() }}</div>
+            <x-pagination :paginator="$media" />
         @endif
     </div>
 </x-layouts.app>

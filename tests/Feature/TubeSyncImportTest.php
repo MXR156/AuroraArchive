@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\ImportTubeSyncSources;
 use App\Models\User;
 use App\Services\TubeSyncImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -37,18 +39,28 @@ test('an authenticated user can preview a tubesync import', function () {
 });
 
 test('an authenticated user can import selected tubesync sources', function () {
+    Queue::fake();
     $user = User::factory()->create();
     $uuid = '52c347fc-d11f-4c2b-8268-e392ccc12565';
-    $summary = ['sources' => 1, 'media' => 12, 'files' => 9, 'thumbnails' => 8, 'queued' => 3, 'metadata_only' => 0];
-
-    $importer = Mockery::mock(TubeSyncImporter::class);
-    $importer->shouldReceive('import')->once()->with($user, [$uuid], true)->andReturn($summary);
-    app()->instance(TubeSyncImporter::class, $importer);
 
     $this->actingAs($user)
         ->post(route('imports.tubesync.store'), ['sources' => [$uuid], 'queue_missing' => '1'])
         ->assertRedirect()
-        ->assertSessionHas('success', fn (string $message): bool => str_contains($message, '3 queued'));
+        ->assertSessionHas('success', 'TubeSync import queued. Large playlists will continue importing in the background.');
+
+    Queue::assertPushed(ImportTubeSyncSources::class, fn (ImportTubeSyncSources $job): bool => $job->user->is($user)
+        && $job->sourceUuids === [$uuid]
+        && $job->queueMissing);
+});
+
+test('the queued tubesync import runs through the importer', function () {
+    $user = User::factory()->create();
+    $uuid = '52c347fc-d11f-4c2b-8268-e392ccc12565';
+    $summary = ['sources' => 1, 'media' => 12, 'files' => 9, 'thumbnails' => 8, 'queued' => 3, 'metadata_only' => 0];
+    $importer = Mockery::mock(TubeSyncImporter::class);
+    $importer->shouldReceive('import')->once()->with($user, [$uuid], true)->andReturn($summary);
+
+    (new ImportTubeSyncSources($user, [$uuid], true))->handle($importer);
 });
 
 test('tubesync source selections must be uuids', function () {
