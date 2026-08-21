@@ -33,12 +33,30 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
 
     public function handle(YoutubeDownloader $youtube): void
     {
-        foreach ($youtube->discover($this->source) as $entry) {
-            $medium = Media::updateOrCreate(['youtube_id' => (string) $entry['id']], ['source_id' => $this->source->id, 'title' => (string) ($entry['title'] ?? $entry['id']), 'description' => Arr::get($entry, 'description'), 'channel_name' => Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader'), 'channel_id' => Arr::get($entry, 'channel_id'), 'published_at' => filled(Arr::get($entry, 'timestamp')) ? now()->setTimestamp((int) Arr::get($entry, 'timestamp')) : null, 'duration_seconds' => Arr::get($entry, 'duration'), 'thumbnail_url' => Arr::get($entry, 'thumbnail'), 'original_url' => Arr::get($entry, 'webpage_url') ?: 'https://www.youtube.com/watch?v='.$entry['id'], 'status' => MediaStatus::Discovered, 'metadata' => Arr::only($entry, ['availability', 'live_status'])]);
-            if ($medium->wasRecentlyCreated && $this->source->auto_download) {
+        foreach ($youtube->discover($this->source) as $position => $entry) {
+            $medium = Media::query()->firstOrNew(['youtube_id' => (string) $entry['id']]);
+            $isNew = ! $medium->exists;
+            $metadata = array_replace_recursive($medium->metadata ?? [], Arr::only($entry, ['availability', 'live_status']));
+            $medium->fill([
+                'source_id' => $isNew ? $this->source->id : $medium->source_id,
+                'title' => Arr::get($metadata, 'manual.title') ? $medium->title : (string) ($entry['title'] ?? $entry['id']),
+                'description' => Arr::get($metadata, 'manual.description') ? $medium->description : Arr::get($entry, 'description'),
+                'channel_name' => Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader'),
+                'channel_id' => Arr::get($entry, 'channel_id'),
+                'published_at' => filled(Arr::get($entry, 'timestamp')) ? now()->setTimestamp((int) Arr::get($entry, 'timestamp')) : null,
+                'duration_seconds' => Arr::get($entry, 'duration'),
+                'thumbnail_url' => Arr::get($entry, 'thumbnail'),
+                'original_url' => Arr::get($entry, 'webpage_url') ?: 'https://www.youtube.com/watch?v='.$entry['id'],
+                'status' => $isNew ? MediaStatus::Discovered : $medium->status,
+                'metadata' => $metadata,
+            ])->save();
+            if ($isNew && $this->source->auto_download) {
                 $medium->update(['status' => MediaStatus::Queued]);
                 DownloadMedia::dispatch($medium);
             }
+            $this->source->playlistMedia()->syncWithoutDetaching([
+                $medium->id => ['position' => (int) (Arr::get($entry, 'playlist_index') ?: $position + 1)],
+            ]);
         }
         $this->source->update(['last_scanned_at' => now(), 'next_scan_at' => now()->addMinutes($this->source->scan_interval_minutes), 'last_scan_status' => 'successful', 'last_scan_error' => null]);
     }

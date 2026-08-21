@@ -6,14 +6,18 @@ use App\Contracts\YoutubeDownloader;
 use App\Models\YoutubeCredential;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    public function edit(Request $request): View
+    public function edit(Request $request, YoutubeDownloader $youtube): View
     {
-        return view('settings', ['credential' => YoutubeCredential::query()->whereBelongsTo($request->user())->first()]);
+        return view('settings', [
+            'credential' => YoutubeCredential::query()->whereBelongsTo($request->user())->first(),
+            'ytDlpVersion' => $youtube->version(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -43,5 +47,17 @@ class SettingsController extends Controller
         YoutubeCredential::query()->whereBelongsTo($request->user())->delete();
 
         return back()->with('success', 'Cookies removed.');
+    }
+
+    public function updateDownloader(Request $request, YoutubeDownloader $youtube): RedirectResponse
+    {
+        $data = $request->validate(['channel' => ['required', Rule::in(['stable', 'nightly'])]]);
+        $result = $youtube->update($data['channel']);
+
+        if (! $result['successful']) {
+            return back()->withErrors(['yt_dlp' => $result['message']]);
+        }
+
+        return back()->with('success', 'yt-dlp updated to '.$data['channel'].' ('.($result['version'] ?? 'version unavailable').').');
     }
 }

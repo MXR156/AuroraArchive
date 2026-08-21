@@ -8,8 +8,9 @@ umask "$UMASK"
 groupmod -o -g "$PGID" www-data
 usermod -o -u "$PUID" -g "$PGID" www-data
 
-mkdir -p /media /config storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
+mkdir -p /media /config storage/app/tmp storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
+chmod 0700 storage/app/tmp
 chown www-data:www-data /media /config 2>/dev/null || true
 if ! su -s /bin/sh www-data -c 'test -w /media && test -w /config'; then echo "ERROR: /media and /config must be writable by PUID $PUID and PGID $PGID." >&2; exit 1; fi
 

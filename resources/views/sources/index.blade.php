@@ -31,17 +31,18 @@
                 <article class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/8 bg-zinc-900 p-5">
                     <div>
                         <div class="flex gap-2">
-                            <h2 class="font-semibold">{{ $source->name }}</h2>
+                            <h2 class="font-semibold"><a href="{{ route('sources.show', $source) }}" class="hover:underline">{{ $source->name }}</a></h2>
                             <span class="badge">{{ $source->enabled ? 'Enabled' : 'Paused' }}</span>
                         </div>
                         <p class="mt-1 text-sm text-zinc-500">
-                            {{ ucfirst($source->type) }} &middot; {{ $source->media_count }} items &middot; {{ $source->last_scanned_at?->diffForHumans() ?? 'Never scanned' }}
+                            {{ ucfirst($source->type) }} &middot; {{ $source->playlist_media_count }} items &middot; {{ $source->last_scanned_at?->diffForHumans() ?? 'Never scanned' }}
                         </p>
                         @if($source->last_scan_error)
                             <p class="mt-2 text-xs text-red-300">{{ $source->last_scan_error }}</p>
                         @endif
                     </div>
                     <div class="flex gap-2">
+                        <a href="{{ route('sources.show', $source) }}" class="secondary">View</a>
                         <form method="POST" action="{{ route('sources.scan', $source) }}">
                             @csrf
                             <button class="secondary">Scan</button>

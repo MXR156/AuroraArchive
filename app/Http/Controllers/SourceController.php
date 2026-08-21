@@ -13,7 +13,15 @@ class SourceController extends Controller
 {
     public function index(Request $request): View
     {
-        return view('sources.index', ['sources' => $request->user()->sources()->withCount('media')->latest()->get()]);
+        return view('sources.index', ['sources' => $request->user()->sources()->withCount('playlistMedia')->latest()->get()]);
+    }
+
+    public function show(Request $request, Source $source): View
+    {
+        $this->owned($request, $source);
+        $media = $source->playlistMedia()->orderByPivot('position')->orderBy('media.id')->paginate(48);
+
+        return view('sources.show', compact('source', 'media'));
     }
 
     public function store(StoreSourceRequest $request): RedirectResponse

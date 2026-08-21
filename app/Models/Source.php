@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Source extends Model
@@ -25,5 +26,10 @@ class Source extends Model
     public function media(): HasMany
     {
         return $this->hasMany(Media::class);
+    }
+
+    public function playlistMedia(): BelongsToMany
+    {
+        return $this->belongsToMany(Media::class)->withPivot('position')->withTimestamps();
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Media;
 use App\Models\Source;
 use App\Models\YoutubeCredential;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -19,7 +20,7 @@ class YtDlpService implements YoutubeDownloader
         $arguments = $source->type === 'video'
             ? ['--dump-single-json', '--no-playlist', '--no-warnings', $source->url]
             : ['--dump-single-json', '--flat-playlist', '--no-warnings', $source->url];
-        $result = $this->run($arguments, $this->cookiesFor($source->user_id));
+        $result = $this->run($arguments, $this->cookiesFor($source->user_id), preserveStdout: true);
         if ($result['exit_code'] !== 0) {
             throw new RuntimeException($result['stderr']);
         }
@@ -33,7 +34,7 @@ class YtDlpService implements YoutubeDownloader
     {
         $directory = $this->destination($media);
         $template = $directory.'/%(upload_date>%Y-%m-%d)s - %(title).160B [%(id)s].%(ext)s';
-        $result = $this->run(['--newline', '--no-playlist', '--write-thumbnail', '--write-info-json', '--merge-output-format', 'mkv', '-o', $template, $media->original_url], $this->cookiesFor($media->source?->user_id), 7200);
+        $result = $this->run(['--newline', '--no-playlist', '--embed-thumbnail', '--merge-output-format', 'mkv', '-o', $template, $media->original_url], $this->cookiesFor($media->source?->user_id), 7200);
         $result['files'] = array_values(array_filter(glob($directory.'/*') ?: [], fn (string $path): bool => Str::contains(basename($path), '['.$media->youtube_id.']')));
         $result['version'] = $this->version();
 
@@ -72,13 +73,39 @@ class YtDlpService implements YoutubeDownloader
         }
     }
 
+    public function update(string $channel): array
+    {
+        try {
+            $result = $this->run(['--update-to', $channel], null, 120);
+            $message = trim($result['stdout'].PHP_EOL.$result['stderr']);
+
+            return [
+                'successful' => $result['exit_code'] === 0,
+                'message' => $message ?: 'yt-dlp did not return an update status.',
+                'version' => $this->version(),
+            ];
+        } catch (Throwable $exception) {
+            return [
+                'successful' => false,
+                'message' => $this->sanitise($exception->getMessage()),
+                'version' => $this->version(),
+            ];
+        }
+    }
+
     /** @param list<string> $arguments @return array{exit_code:int,stdout:string,stderr:string} */
-    private function run(array $arguments, ?string $cookies = null, int $timeout = 120): array
+    private function run(array $arguments, ?string $cookies = null, int $timeout = 120, bool $preserveStdout = false): array
     {
         $cookiePath = null;
         try {
+            $tempRoot = (string) config('auroraarchive.temp_root');
+            File::ensureDirectoryExists($tempRoot, 0700);
+            if (! is_writable($tempRoot)) {
+                throw new RuntimeException('The application temporary directory is not writable.');
+            }
+
             if (filled($cookies)) {
-                $cookiePath = tempnam(sys_get_temp_dir(), 'aurora-cookie-');
+                $cookiePath = tempnam($tempRoot, 'aurora-cookie-');
                 if ($cookiePath === false) {
                     throw new RuntimeException('Unable to create temporary cookie file.');
                 }
@@ -87,9 +114,14 @@ class YtDlpService implements YoutubeDownloader
                 $arguments = ['--cookies', $cookiePath, ...$arguments];
             }
             $process = new Process([config('auroraarchive.yt_dlp'), ...$arguments]);
+            $process->setEnv(['TMPDIR' => $tempRoot, 'TMP' => $tempRoot, 'TEMP' => $tempRoot, 'PYTHONHASHSEED' => '0']);
             $process->setTimeout($timeout)->run();
 
-            return ['exit_code' => $process->getExitCode() ?? 1, 'stdout' => $this->sanitise($process->getOutput()), 'stderr' => $this->sanitise($process->getErrorOutput())];
+            return [
+                'exit_code' => $process->getExitCode() ?? 1,
+                'stdout' => $preserveStdout ? $process->getOutput() : $this->sanitise($process->getOutput()),
+                'stderr' => $this->sanitise($process->getErrorOutput()),
+            ];
         } finally {
             if ($cookiePath !== null && is_file($cookiePath)) {
                 unlink($cookiePath);
@@ -111,13 +143,21 @@ class YtDlpService implements YoutubeDownloader
     private function destination(Media $media): string
     {
         $root = rtrim(config('auroraarchive.media_root'), DIRECTORY_SEPARATOR);
-        $folder = Str::of($media->channel_name ?: 'Unsorted')->replace(['..', '/', '\\'], '-')->trim()->toString();
-        $path = $root.DIRECTORY_SEPARATOR.$folder;
+        $sourceFolder = $this->safeFolderName($media->source?->name ?: $media->channel_name ?: 'Unsorted');
+        $path = $root.DIRECTORY_SEPARATOR.$sourceFolder;
+        if ($media->source?->type === 'playlist' && filled($media->channel_name)) {
+            $path .= DIRECTORY_SEPARATOR.$this->safeFolderName($media->channel_name);
+        }
         if (! is_dir($path) && ! mkdir($path, 0775, true) && ! is_dir($path)) {
             throw new RuntimeException('Media destination is not writable.');
         }
 
         return $path;
+    }
+
+    private function safeFolderName(string $name): string
+    {
+        return Str::of($name)->replace(['..', '/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-')->trim()->limit(120, '')->toString() ?: 'Unsorted';
     }
 
     private function sanitise(string $value): string

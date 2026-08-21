@@ -16,5 +16,8 @@ interface YoutubeDownloader
     /** @return array{status:string,message:string} */
     public function testAuthentication(string $cookies): array;
 
+    /** @return array{successful:bool,message:string,version:?string} */
+    public function update(string $channel): array;
+
     public function version(): ?string;
 }

@@ -10,6 +10,7 @@ use App\Models\MediaFile;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -49,7 +50,16 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
                 MediaFile::updateOrCreate(['media_id' => $this->media->id, 'path' => Str::after(str_replace('\\', '/', $path), rtrim(str_replace('\\', '/', config('auroraarchive.media_root')), '/').'/')], ['mime_type' => mime_content_type($path) ?: null, 'size_bytes' => filesize($path) ?: null]);
             }
         }
-        $this->media->update(['status' => MediaStatus::Downloaded]);
+        $thumbnail = collect($result['files'])->first(fn (string $path): bool => is_file($path) && Str::endsWith(Str::lower($path), ['.jpg', '.jpeg', '.png', '.webp', '.avif']));
+        $metadata = $this->media->metadata ?? [];
+        if ($thumbnail !== null) {
+            Arr::set($metadata, 'local_thumbnail_path', Str::after(str_replace('\\', '/', $thumbnail), rtrim(str_replace('\\', '/', config('auroraarchive.media_root')), '/').'/'));
+        }
+        $this->media->update([
+            'status' => MediaStatus::Downloaded,
+            'thumbnail_url' => $thumbnail === null ? $this->media->thumbnail_url : route('media.thumbnail', $this->media, absolute: false),
+            'metadata' => $metadata,
+        ]);
     }
 
     public function failed(?Throwable $exception): void

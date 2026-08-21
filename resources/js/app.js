@@ -10,4 +10,7 @@ document.querySelectorAll('.media-player').forEach((player) => {
         fetch(player.dataset.progressUrl,{method:'PUT',keepalive:true,headers:{'Content-Type':'application/json','X-CSRF-TOKEN':csrfToken,'Accept':'application/json'},body:JSON.stringify({position_seconds:Math.floor(player.currentTime),watched:player.duration>0&&player.currentTime/player.duration>.9})});
     };
     player.addEventListener('timeupdate',save); player.addEventListener('pause',save);
+    player.addEventListener('ended', () => {
+        if (player.dataset.nextUrl) window.location.assign(player.dataset.nextUrl);
+    });
 });

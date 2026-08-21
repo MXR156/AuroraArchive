@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use App\Enums\MediaStatus;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 
 class Media extends Model
 {
@@ -18,6 +22,63 @@ class Media extends Model
     protected function casts(): array
     {
         return ['published_at' => 'datetime', 'status' => MediaStatus::class, 'metadata' => 'array'];
+    }
+
+    protected function thumbnailUrl(): Attribute
+    {
+        return Attribute::get(fn (?string $value): string => $value ?: 'https://i.ytimg.com/vi/'.$this->youtube_id.'/hqdefault.jpg');
+    }
+
+    public function youtubeChannelUrl(): ?string
+    {
+        $sourceMetadata = collect(Arr::get($this->metadata ?? [], 'tubesync.sources', []));
+        $candidates = [
+            Arr::get($this->metadata, 'channel_url'),
+            Arr::get($this->metadata, 'uploader_url'),
+            $sourceMetadata->pluck('metadata.channel_url')->first(fn (mixed $url): bool => filled($url)),
+            $sourceMetadata->pluck('metadata.uploader_url')->first(fn (mixed $url): bool => filled($url)),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && $this->isYoutubeUrl($candidate)) {
+                return $candidate;
+            }
+        }
+
+        if (filled($this->channel_id)) {
+            return Str::startsWith($this->channel_id, '@')
+                ? 'https://www.youtube.com/'.$this->channel_id
+                : 'https://www.youtube.com/channel/'.$this->channel_id;
+        }
+
+        return null;
+    }
+
+    public function youtubeVideoUrl(): string
+    {
+        return $this->isYoutubeUrl($this->original_url)
+            ? $this->original_url
+            : 'https://www.youtube.com/watch?v='.$this->youtube_id;
+    }
+
+    public function archiveChannelKey(): string
+    {
+        if (filled($this->channel_id)) {
+            return 'id-'.rawurlencode($this->channel_id);
+        }
+
+        return 'name-'.rtrim(strtr(base64_encode((string) $this->channel_name), '+/', '-_'), '=');
+    }
+
+    private function isYoutubeUrl(mixed $url): bool
+    {
+        if (! is_string($url) || ! Str::startsWith($url, ['https://', 'http://'])) {
+            return false;
+        }
+
+        $host = Str::lower((string) parse_url($url, PHP_URL_HOST));
+
+        return $host === 'youtu.be' || $host === 'youtube.com' || Str::endsWith($host, '.youtube.com');
     }
 
     public function source(): BelongsTo
@@ -38,5 +99,10 @@ class Media extends Model
     public function watchHistory(): HasMany
     {
         return $this->hasMany(WatchHistory::class);
+    }
+
+    public function sources(): BelongsToMany
+    {
+        return $this->belongsToMany(Source::class)->withPivot('position')->withTimestamps();
     }
 }
