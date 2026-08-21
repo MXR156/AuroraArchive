@@ -3,9 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Media;
-use App\Models\MediaFile;
+use App\Services\ApplyMediaFilters;
 use App\Services\RecoverMediaUploaderNames;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class ChannelController extends Controller
@@ -15,7 +16,6 @@ class ChannelController extends Controller
         $recoverUploaderNames->handle();
 
         $channels = Media::query()
-            ->whereIn('id', MediaFile::query()->select('media_id'))
             ->whereNotNull('channel_name')
             ->where('channel_name', '!=', '')
             ->select(['channel_id', 'channel_name'])
@@ -27,18 +27,18 @@ class ChannelController extends Controller
         return view('channels.index', compact('channels'));
     }
 
-    public function show(string $channel): View
+    public function show(Request $request, string $channel, ApplyMediaFilters $filters): View
     {
         $mediaQuery = $this->mediaQuery($channel);
         $representative = (clone $mediaQuery)->firstOrFail();
-        $media = $mediaQuery->latest('published_at')->paginate(48);
+        $media = $filters->handle($mediaQuery, $request)->paginate(48)->withQueryString();
 
         return view('channels.show', compact('representative', 'media'));
     }
 
     private function mediaQuery(string $channel): Builder
     {
-        $query = Media::query()->whereIn('id', MediaFile::query()->select('media_id'));
+        $query = Media::query();
         if (str_starts_with($channel, 'id-')) {
             return $query->where('channel_id', rawurldecode(substr($channel, 3)));
         }

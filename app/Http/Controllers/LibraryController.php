@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\MediaStatus;
 use App\Models\Media;
+use App\Services\ApplyMediaFilters;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class LibraryController extends Controller
 {
-    public function __invoke(Request $request): View
+    public function __invoke(Request $request, ApplyMediaFilters $filters): View
     {
-        $media = Media::query()->when($request->filled('q'), fn ($query) => $query->where(fn ($nested) => $nested->where('title', 'like', '%'.$request->string('q').'%')->orWhere('channel_name', 'like', '%'.$request->string('q').'%')))->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')))->latest('published_at')->paginate(24)->withQueryString();
+        $media = $filters->handle(Media::query(), $request)->paginate(24)->withQueryString();
 
-        return view('library', ['media' => $media, 'statuses' => MediaStatus::cases()]);
+        return view('library', compact('media'));
     }
 }

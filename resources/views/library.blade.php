@@ -1,1 +1,23 @@
-<x-layouts.app title="Library"><div class="mb-7 flex flex-wrap items-end justify-between gap-4"><div><p class="text-sm text-zinc-500">{{ $media->total() }} items</p><h1 class="text-3xl font-bold">Library</h1></div><form class="flex gap-2"><input name="q" value="{{ request('q') }}" placeholder="Search" class="field"><select name="status" class="field"><option value="">All statuses</option>@foreach($statuses as $status)<option value="{{ $status->value }}" @selected(request('status')===$status->value)>{{ ucfirst($status->value) }}</option>@endforeach</select><button class="secondary">Filter</button></form></div><div class="video-grid">@foreach($media as $medium)<x-video-card :medium="$medium" />@endforeach</div><div class="mt-10">{{ $media->links() }}</div></x-layouts.app>
+<x-layouts.app title="Library">
+    <div class="grid gap-7">
+        <header>
+            <p class="text-sm text-zinc-500">{{ $media->total() }} items</p>
+            <h1 class="text-3xl font-bold">Library</h1>
+        </header>
+
+        <x-media-filters :clear-url="route('library')" />
+
+        @if($media->isEmpty())
+            <div class="border-t border-white/10 py-16 text-center text-zinc-500">No media matches these filters.</div>
+        @else
+            <form method="POST" action="{{ route('media.bulk-retry') }}" class="grid gap-5">
+                @csrf
+                @if($media->contains(fn ($medium) => $medium->status->value === 'failed'))<x-bulk-retry-toolbar />@endif
+                <div class="video-grid">
+                    @foreach($media as $medium)<x-video-card :medium="$medium" :selectable="true" />@endforeach
+                </div>
+            </form>
+            <div>{{ $media->links() }}</div>
+        @endif
+    </div>
+</x-layouts.app>

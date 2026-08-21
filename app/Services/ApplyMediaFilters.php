@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Services;
+
+use App\Enums\MediaStatus;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Http\Request;
+
+class ApplyMediaFilters
+{
+    public function handle(Builder|BelongsToMany $query, Request $request, bool $playlistOrder = false): Builder|BelongsToMany
+    {
+        $search = $request->string('q')->trim()->toString();
+        if ($search !== '') {
+            $query->where(fn ($nested) => $nested
+                ->where('title', 'like', '%'.$search.'%')
+                ->orWhere('channel_name', 'like', '%'.$search.'%'));
+        }
+
+        $filter = $request->string('filter')->toString() ?: $request->string('status')->toString();
+        match ($filter) {
+            'downloaded' => $query->whereHas('files'),
+            'not_downloaded' => $query->whereDoesntHave('files'),
+            'watched' => $query->whereHas('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
+            'unwatched' => $query->whereDoesntHave('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
+            'discovered' => $query->where('status', MediaStatus::Discovered),
+            'queued' => $query->where('status', MediaStatus::Queued),
+            'downloading' => $query->where('status', MediaStatus::Downloading),
+            'failed' => $query->where('status', MediaStatus::Failed),
+            'skipped' => $query->where('status', MediaStatus::Skipped),
+            default => $query,
+        };
+
+        $sort = $request->string('sort')->toString();
+        if ($playlistOrder && ($sort === '' || $sort === 'playlist')) {
+            return $query->orderByPivot('position')->orderBy('media.id');
+        }
+
+        return match ($sort) {
+            'oldest' => $query->orderBy('media.published_at')->orderBy('media.id'),
+            'title' => $query->orderBy('media.title')->orderBy('media.id'),
+            'duration_longest' => $query->orderByDesc('media.duration_seconds')->orderBy('media.id'),
+            'duration_shortest' => $query->orderBy('media.duration_seconds')->orderBy('media.id'),
+            'recently_added' => $query->latest('media.created_at'),
+            default => $query->latest('media.published_at')->latest('media.id'),
+        };
+    }
+}

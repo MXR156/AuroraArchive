@@ -22,7 +22,7 @@ function downloadedChannelMedia(string $youtubeId, string $channelName, ?string 
     return $medium;
 }
 
-test('the channels page groups downloaded media by creator', function () {
+test('the channels page groups archived media by creator', function () {
     $user = User::factory()->create();
     downloadedChannelMedia('AAAAAAAAAAA', 'Example Creator', 'UC123');
     downloadedChannelMedia('BBBBBBBBBBB', 'Example Creator', 'UC123');
@@ -37,8 +37,8 @@ test('the channels page groups downloaded media by creator', function () {
         ->get(route('channels.index'))
         ->assertOk()
         ->assertSee('Example Creator')
-        ->assertSee('2 downloaded videos')
-        ->assertDontSee('Not Downloaded')
+        ->assertSee('2 videos')
+        ->assertSee('Not Downloaded')
         ->assertSee(route('channels.show', 'id-UC123'), escape: false);
 });
 

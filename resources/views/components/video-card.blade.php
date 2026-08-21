@@ -1,5 +1,10 @@
-@props(['medium', 'href' => null])
-<article class="group min-w-0">
+@props(['medium', 'href' => null, 'selectable' => false])
+<article class="group relative min-w-0">
+    @if($selectable && $medium->status->value === 'failed')
+        <label class="absolute top-2 right-2 z-10 grid size-8 cursor-pointer place-items-center rounded bg-black/85" title="Select for retry">
+            <input type="checkbox" name="media_ids[]" value="{{ $medium->id }}" class="size-4 accent-violet-500" aria-label="Select {{ $medium->title }} for retry">
+        </label>
+    @endif
     <a href="{{ $href ?: route('media.show', $medium) }}" class="relative block aspect-video overflow-hidden rounded-xl bg-zinc-900">
         <img src="{{ route('media.thumbnail', $medium) }}" alt="" class="size-full object-cover transition group-hover:scale-[1.03]" loading="lazy">
         @if($medium->duration_seconds)

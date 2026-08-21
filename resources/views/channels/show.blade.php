@@ -4,16 +4,26 @@
             <div>
                 <a href="{{ route('channels.index') }}" class="text-sm text-zinc-500 hover:text-zinc-300">Channels</a>
                 <h1 class="mt-1 text-3xl font-bold">{{ $representative->channel_name }}</h1>
-                <p class="mt-2 text-sm text-zinc-500">{{ $media->total() }} downloaded {{ Str::plural('video', $media->total()) }}</p>
+                <p class="mt-2 text-sm text-zinc-500">{{ $media->total() }} {{ Str::plural('video', $media->total()) }}</p>
             </div>
             @if($representative->youtubeChannelUrl())
                 <a href="{{ $representative->youtubeChannelUrl() }}" target="_blank" rel="noopener noreferrer" class="secondary">Open on YouTube</a>
             @endif
         </header>
 
-        <div class="video-grid">
-            @foreach($media as $medium)<x-video-card :medium="$medium" />@endforeach
-        </div>
+        <x-media-filters :clear-url="route('channels.show', $representative->archiveChannelKey())" />
+
+        @if($media->isEmpty())
+            <div class="border-t border-white/10 py-16 text-center text-zinc-500">No media matches these filters.</div>
+        @else
+            <form method="POST" action="{{ route('media.bulk-retry') }}" class="grid gap-5">
+                @csrf
+                @if($media->contains(fn ($medium) => $medium->status->value === 'failed'))<x-bulk-retry-toolbar />@endif
+                <div class="video-grid">
+                    @foreach($media as $medium)<x-video-card :medium="$medium" :selectable="true" />@endforeach
+                </div>
+            </form>
+        @endif
         <div>{{ $media->links() }}</div>
     </div>
 </x-layouts.app>

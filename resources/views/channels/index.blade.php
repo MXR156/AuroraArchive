@@ -1,7 +1,7 @@
 <x-layouts.app title="Channels">
     <div class="grid gap-7">
         <header>
-            <p class="text-sm text-zinc-500">{{ $channels->total() }} creators with downloaded media</p>
+            <p class="text-sm text-zinc-500">{{ $channels->total() }} creators in your archive</p>
             <h1 class="text-3xl font-bold">Channels</h1>
         </header>
 
@@ -18,7 +18,7 @@
                         </a>
                         <div class="pt-3">
                             <a href="{{ route('channels.show', $channel->archiveChannelKey()) }}" class="font-semibold hover:underline">{{ $channel->channel_name }}</a>
-                            <p class="mt-1 text-sm text-zinc-500">{{ number_format($channel->media_count) }} downloaded {{ Str::plural('video', $channel->media_count) }}</p>
+                            <p class="mt-1 text-sm text-zinc-500">{{ number_format($channel->media_count) }} {{ Str::plural('video', $channel->media_count) }}</p>
                         </div>
                     </article>
                 @endforeach

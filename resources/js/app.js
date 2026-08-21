@@ -14,3 +14,8 @@ document.querySelectorAll('.media-player').forEach((player) => {
         if (player.dataset.nextUrl) window.location.assign(player.dataset.nextUrl);
     });
 });
+document.querySelectorAll('[data-select-failed]').forEach((button) => {
+    button.addEventListener('click', () => {
+        button.closest('form')?.querySelectorAll('input[name="media_ids[]"]').forEach((checkbox) => { checkbox.checked = true; });
+    });
+});

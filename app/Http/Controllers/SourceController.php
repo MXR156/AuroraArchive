@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreSourceRequest;
 use App\Jobs\ScanSource;
 use App\Models\Source;
+use App\Services\ApplyMediaFilters;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -16,10 +17,10 @@ class SourceController extends Controller
         return view('sources.index', ['sources' => $request->user()->sources()->withCount('playlistMedia')->latest()->get()]);
     }
 
-    public function show(Request $request, Source $source): View
+    public function show(Request $request, Source $source, ApplyMediaFilters $filters): View
     {
         $this->owned($request, $source);
-        $media = $source->playlistMedia()->orderByPivot('position')->orderBy('media.id')->paginate(48);
+        $media = $filters->handle($source->playlistMedia(), $request, playlistOrder: true)->paginate(48)->withQueryString();
 
         return view('sources.show', compact('source', 'media'));
     }

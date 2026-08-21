@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MediaStatus;
+use App\Http\Requests\BulkRetryMediaRequest;
 use App\Http\Requests\UpdateMediaRequest;
 use App\Jobs\DownloadMedia;
 use App\Jobs\GenerateMediaThumbnail;
@@ -46,6 +47,22 @@ class MediaController extends Controller
         }
 
         return back()->with('success', 'Download queued.');
+    }
+
+    public function bulkRetry(BulkRetryMediaRequest $request): RedirectResponse
+    {
+        $media = Media::query()
+            ->whereIn('id', $request->validated('media_ids'))
+            ->where('status', MediaStatus::Failed)
+            ->whereDoesntHave('files')
+            ->get();
+
+        foreach ($media as $medium) {
+            $medium->update(['status' => MediaStatus::Queued]);
+            DownloadMedia::dispatch($medium);
+        }
+
+        return back()->with('success', $media->count().' failed '.str('video')->plural($media->count()).' queued for retry.');
     }
 
     public function edit(Media $medium): View

@@ -28,9 +28,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/library', LibraryController::class)->name('library');
     Route::get('/channels', [ChannelController::class, 'index'])->name('channels.index');
     Route::get('/channels/{channel}', [ChannelController::class, 'show'])->name('channels.show');
-    Route::get('/downloads', fn () => redirect()->route('library', ['status' => 'downloading']))->name('downloads');
+    Route::get('/downloads', fn () => redirect()->route('library', ['filter' => 'downloading']))->name('downloads');
     Route::get('/watch/{medium}', [MediaController::class, 'show'])->name('media.show');
     Route::get('/media/{medium}/edit', [MediaController::class, 'edit'])->name('media.edit');
+    Route::post('/media/retry', [MediaController::class, 'bulkRetry'])->name('media.bulk-retry');
     Route::put('/media/{medium}', [MediaController::class, 'update'])->name('media.update');
     Route::get('/media/{medium}/stream', [MediaController::class, 'stream'])->name('media.stream');
     Route::get('/media/{medium}/thumbnail', [MediaController::class, 'thumbnail'])->name('media.thumbnail');

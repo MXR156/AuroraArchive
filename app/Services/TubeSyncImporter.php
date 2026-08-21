@@ -88,7 +88,7 @@ class TubeSyncImporter
             $directMetadata = $this->metadataForMedia($rows->pluck('uuid')->map(fn (mixed $uuid): string => (string) $uuid)->all());
 
             foreach ($rows->values() as $position => $row) {
-                $metadata = array_replace_recursive($directMetadata->get((string) $row->uuid, []), $sourceMetadata->get((string) $row->key, []));
+                $metadata = array_replace_recursive($sourceMetadata->get((string) $row->key, []), $directMetadata->get((string) $row->uuid, []));
                 $medium = $this->importMedium($source, $row, $metadata);
                 $source->playlistMedia()->syncWithoutDetaching([
                     $medium->id => ['position' => (int) (Arr::get($metadata, 'playlist_index') ?: $position + 1)],
@@ -171,7 +171,7 @@ class TubeSyncImporter
         $medium->fill([
             'title' => $title,
             'description' => $description,
-            'channel_name' => Arr::get($metadata, 'uploader') ?: Arr::get($metadata, 'channel'),
+            'channel_name' => Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader'),
             'channel_id' => Arr::get($metadata, 'channel_id') ?: Arr::get($metadata, 'uploader_id'),
             'published_at' => $this->publishedAt($row->published, $metadata),
             'duration_seconds' => $row->duration ?: Arr::get($metadata, 'duration'),
