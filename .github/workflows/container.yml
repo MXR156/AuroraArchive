@@ -23,11 +23,16 @@ jobs:
         id: meta
         with:
           images: ghcr.io/mxr156/auroraarchive
+          labels: |
+            org.opencontainers.image.source=https://github.com/MXR156/AuroraArchive
+            org.opencontainers.image.title=AuroraArchive
+            org.opencontainers.image.description=A private, self-hosted YouTube archiver and local streaming library.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
             type=sha
       - uses: docker/build-push-action@v6
+        id: push
         with:
           context: .
           platforms: linux/amd64,linux/arm64

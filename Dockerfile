@@ -14,9 +14,18 @@ RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --opt
 
 FROM php:8.5-fpm-bookworm
 ARG TARGETARCH
-RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor ffmpeg curl unzip procps passwd libzip-dev libicu-dev libsqlite3-dev ca-certificates \
-    && docker-php-ext-install pdo_mysql pdo_sqlite intl opcache pcntl zip \
-    && case "$TARGETARCH" in amd64) YTDLP_ARCH=""; DENO_ARCH="x86_64" ;; arm64) YTDLP_ARCH="_aarch64"; DENO_ARCH="aarch64" ;; *) exit 1 ;; esac \
+LABEL org.opencontainers.image.source="https://github.com/MXR156/AuroraArchive" \
+      org.opencontainers.image.title="AuroraArchive" \
+      org.opencontainers.image.description="A private, self-hosted YouTube archiver and local streaming library."
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nginx supervisor ffmpeg curl unzip procps passwd libzip-dev libicu-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# PHP 8.5 already includes PDO SQLite and OPcache. Reinstalling OPcache fails
+# because it is built into PHP 8.5 rather than emitted as a shared module.
+RUN docker-php-ext-install -j1 pdo_mysql intl pcntl zip
+
+RUN case "$TARGETARCH" in amd64) YTDLP_ARCH=""; DENO_ARCH="x86_64" ;; arm64) YTDLP_ARCH="_aarch64"; DENO_ARCH="aarch64" ;; *) exit 1 ;; esac \
     && curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux${YTDLP_ARCH}" -o /usr/local/bin/yt-dlp \
     && chmod 0755 /usr/local/bin/yt-dlp \
     && curl -fsSL "https://github.com/denoland/deno/releases/latest/download/deno-${DENO_ARCH}-unknown-linux-gnu.zip" -o /tmp/deno.zip \
