@@ -16,9 +16,9 @@
         @if($media->isEmpty())
             <div class="border-t border-white/10 py-16 text-center text-zinc-500">No media matches these filters.</div>
         @else
-            <form method="POST" action="{{ route('media.bulk-retry') }}" class="grid gap-5">
+            <form method="POST" action="{{ route('media.bulk-manage') }}" class="grid gap-5" data-bulk-media-form>
                 @csrf
-                @if($media->contains(fn ($medium) => $medium->status->value === 'failed'))<x-bulk-retry-toolbar />@endif
+                <x-bulk-media-toolbar />
                 <div class="video-grid">
                     @foreach($media as $medium)<x-video-card :medium="$medium" :selectable="true" />@endforeach
                 </div>

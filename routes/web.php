@@ -31,6 +31,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/downloads', fn () => redirect()->route('library', ['filter' => 'downloading']))->name('downloads');
     Route::get('/watch/{medium}', [MediaController::class, 'show'])->name('media.show');
     Route::get('/media/{medium}/edit', [MediaController::class, 'edit'])->name('media.edit');
+    Route::post('/media/bulk', [MediaController::class, 'bulkManage'])->name('media.bulk-manage');
     Route::post('/media/retry', [MediaController::class, 'bulkRetry'])->name('media.bulk-retry');
     Route::put('/media/{medium}', [MediaController::class, 'update'])->name('media.update');
     Route::get('/media/{medium}/stream', [MediaController::class, 'stream'])->name('media.stream');

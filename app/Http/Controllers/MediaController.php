@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\MediaStatus;
+use App\Http\Requests\BulkManageMediaRequest;
 use App\Http\Requests\BulkRetryMediaRequest;
 use App\Http\Requests\UpdateMediaRequest;
 use App\Jobs\DownloadMedia;
@@ -63,6 +64,32 @@ class MediaController extends Controller
         }
 
         return back()->with('success', $media->count().' failed '.str('video')->plural($media->count()).' queued for retry.');
+    }
+
+    public function bulkManage(BulkManageMediaRequest $request, DeleteMedia $deleteMedia): RedirectResponse
+    {
+        $media = Media::query()
+            ->whereIn('id', $request->validated('media_ids'))
+            ->with('files')
+            ->get();
+
+        if ($request->validated('action') === 'delete') {
+            foreach ($media as $medium) {
+                $deleteMedia->handle($medium);
+            }
+
+            return back()->with('success', $media->count().' selected '.str('video')->plural($media->count()).' deleted.');
+        }
+
+        $queued = $media->filter(fn (Media $medium): bool => $medium->files->isEmpty()
+            && ! in_array($medium->status, [MediaStatus::Queued, MediaStatus::Downloading], true));
+
+        foreach ($queued as $medium) {
+            $medium->update(['status' => MediaStatus::Queued]);
+            DownloadMedia::dispatch($medium);
+        }
+
+        return back()->with('success', $queued->count().' selected '.str('video')->plural($queued->count()).' queued for download.');
     }
 
     public function edit(Media $medium): View

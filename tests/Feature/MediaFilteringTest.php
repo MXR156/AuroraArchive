@@ -48,6 +48,15 @@ test('the library supports status filtering and title sorting', function () {
         ->assertDontSee('Failed video');
 });
 
+test('media filter dropdowns expose automatic submission controls', function () {
+    $this->actingAs(User::factory()->create())
+        ->get(route('library'))
+        ->assertOk()
+        ->assertSee('data-media-filters', escape: false)
+        ->assertSee('aria-label="Media filter"', escape: false)
+        ->assertSee('aria-label="Media sort order"', escape: false);
+});
+
 test('playlist pages use the shared filters while retaining playlist order by default', function () {
     $user = User::factory()->create();
     $source = Source::query()->create([

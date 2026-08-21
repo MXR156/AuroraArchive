@@ -1,5 +1,8 @@
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 document.querySelector('.nav-toggle')?.addEventListener('click', () => document.querySelector('.nav-menu')?.classList.toggle('hidden'));
+document.querySelectorAll('[data-media-filters] select').forEach((select) => {
+    select.addEventListener('change', () => select.form?.requestSubmit());
+});
 document.querySelectorAll('.media-player').forEach((player) => {
     const resumeAt = Number(player.dataset.resume || 0);
     player.addEventListener('loadedmetadata', () => { if (resumeAt > 0 && resumeAt < player.duration - 10) player.currentTime = resumeAt; }, { once: true });
@@ -14,8 +17,30 @@ document.querySelectorAll('.media-player').forEach((player) => {
         if (player.dataset.nextUrl) window.location.assign(player.dataset.nextUrl);
     });
 });
-document.querySelectorAll('[data-select-failed]').forEach((button) => {
-    button.addEventListener('click', () => {
-        button.closest('form')?.querySelectorAll('input[name="media_ids[]"]').forEach((checkbox) => { checkbox.checked = true; });
+document.querySelectorAll('[data-bulk-media-form]').forEach((form) => {
+    const checkboxes = [...form.querySelectorAll('input[name="media_ids[]"]')];
+    const toolbar = form.querySelector('[data-bulk-toolbar]');
+    const selectedCount = form.querySelector('[data-selected-count]');
+    const refreshToolbar = () => {
+        const count = checkboxes.filter((checkbox) => checkbox.checked).length;
+        selectedCount.textContent = count;
+        toolbar.classList.toggle('hidden', count === 0);
+        toolbar.classList.toggle('flex', count > 0);
+    };
+
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refreshToolbar));
+    form.querySelector('[data-select-all]')?.addEventListener('click', () => {
+        checkboxes.forEach((checkbox) => { checkbox.checked = true; });
+        refreshToolbar();
+    });
+    form.querySelector('[data-clear-selection]')?.addEventListener('click', () => {
+        checkboxes.forEach((checkbox) => { checkbox.checked = false; });
+        refreshToolbar();
+    });
+    form.addEventListener('submit', (event) => {
+        const confirmation = event.submitter?.dataset.confirm;
+        if (confirmation && !window.confirm(confirmation)) {
+            event.preventDefault();
+        }
     });
 });

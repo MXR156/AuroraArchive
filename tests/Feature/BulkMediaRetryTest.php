@@ -49,7 +49,7 @@ test('bulk retry requires at least one valid selection', function () {
         ->assertSessionHasErrors('media_ids');
 });
 
-test('failed media cards expose retry selection controls', function () {
+test('failed media cards expose bulk selection controls', function () {
     $user = User::factory()->create();
     retryMedium('AAAAAAAAAAA', MediaStatus::Failed);
     retryMedium('BBBBBBBBBBB', MediaStatus::Skipped);
@@ -57,6 +57,7 @@ test('failed media cards expose retry selection controls', function () {
     $this->actingAs($user)
         ->get(route('library', ['filter' => 'failed']))
         ->assertOk()
-        ->assertSee('Select all failed')
+        ->assertSee('Select all visible')
+        ->assertSee('Download / retry')
         ->assertSee('media_ids[]', escape: false);
 });
