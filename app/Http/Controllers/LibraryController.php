@@ -12,7 +12,8 @@ class LibraryController extends Controller
     public function __invoke(Request $request, ApplyMediaFilters $filters): View
     {
         $media = $filters->handle(Media::query(), $request)->paginate(24)->withQueryString();
+        $playlists = $request->user()->playlists()->orderBy('name')->get();
 
-        return view('library', compact('media'));
+        return view('library', compact('media', 'playlists'));
     }
 }

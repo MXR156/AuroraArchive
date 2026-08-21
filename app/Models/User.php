@@ -37,6 +37,11 @@ class User extends Authenticatable
         return $this->hasMany(Source::class);
     }
 
+    public function playlists(): HasMany
+    {
+        return $this->hasMany(Playlist::class);
+    }
+
     public function youtubeCredential(): HasOne
     {
         return $this->hasOne(YoutubeCredential::class);

@@ -12,7 +12,7 @@
         @else
             <form method="POST" action="{{ route('media.bulk-manage') }}" class="grid gap-5" data-bulk-media-form>
                 @csrf
-                <x-bulk-media-toolbar />
+                <x-bulk-media-toolbar :playlists="$playlists" />
                 <div class="video-grid">
                     @foreach($media as $medium)<x-video-card :medium="$medium" :selectable="true" />@endforeach
                 </div>

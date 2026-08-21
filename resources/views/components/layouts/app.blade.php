@@ -19,6 +19,7 @@
                     ['home', 'Home'],
                     ['channels.index', 'Channels'],
                     ['library', 'Library'],
+                    ['playlists.index', 'Playlists'],
                 ] as [$routeName, $label])
                     <a href="{{ route($routeName) }}" @class([
                         'rounded-lg px-3 py-2.5 text-sm font-medium',

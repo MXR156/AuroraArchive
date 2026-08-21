@@ -105,4 +105,9 @@ class Media extends Model
     {
         return $this->belongsToMany(Source::class)->withPivot('position')->withTimestamps();
     }
+
+    public function playlists(): BelongsToMany
+    {
+        return $this->belongsToMany(Playlist::class)->withPivot('position')->withTimestamps();
+    }
 }

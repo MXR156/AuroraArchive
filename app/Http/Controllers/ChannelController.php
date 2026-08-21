@@ -32,8 +32,9 @@ class ChannelController extends Controller
         $mediaQuery = $this->mediaQuery($channel);
         $representative = (clone $mediaQuery)->firstOrFail();
         $media = $filters->handle($mediaQuery, $request)->paginate(48)->withQueryString();
+        $playlists = $request->user()->playlists()->orderBy('name')->get();
 
-        return view('channels.show', compact('representative', 'media'));
+        return view('channels.show', compact('representative', 'media', 'playlists'));
     }
 
     private function mediaQuery(string $channel): Builder

@@ -21,8 +21,9 @@ class SourceController extends Controller
     {
         $this->owned($request, $source);
         $media = $filters->handle($source->playlistMedia(), $request, playlistOrder: true)->paginate(48)->withQueryString();
+        $playlists = $request->user()->playlists()->orderBy('name')->get();
 
-        return view('sources.show', compact('source', 'media'));
+        return view('sources.show', compact('source', 'media', 'playlists'));
     }
 
     public function store(StoreSourceRequest $request): RedirectResponse

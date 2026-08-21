@@ -1,15 +1,15 @@
 <x-layouts.app :title="$medium->title">
     <div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div class="min-w-0">
-            @if($playlist)
-                <a href="{{ route('sources.show', $playlist) }}" class="mb-3 inline-block text-sm text-zinc-500 hover:text-zinc-300">{{ $playlist->name }}</a>
+            @if($playlistName)
+                <a href="{{ $playlistUrl }}" class="mb-3 inline-block text-sm text-zinc-500 hover:text-zinc-300">{{ $playlistName }}</a>
             @endif
             <div class="aspect-video overflow-hidden rounded-2xl bg-black">
                 @if($medium->files->isNotEmpty())
-                    <video class="media-player size-full" controls @if($playlist) autoplay @endif preload="metadata"
+                    <video class="media-player size-full" controls @if($playlistName) autoplay @endif preload="metadata"
                         data-progress-url="{{ route('media.progress', $medium) }}"
                         data-resume="{{ $medium->watchHistory->first()?->position_seconds ?? 0 }}"
-                        @if($next) data-next-url="{{ route('media.show', ['medium' => $next, 'playlist' => $playlist]) }}" @endif>
+                        @if($nextUrl) data-next-url="{{ $nextUrl }}" @endif>
                         <source src="{{ route('media.stream', $medium) }}" type="{{ $medium->files->first()->mime_type ?: 'video/mp4' }}">
                     </video>
                 @elseif($medium->thumbnail_url)
@@ -29,10 +29,26 @@
                         &middot; <a href="{{ $medium->youtubeVideoUrl() }}" target="_blank" rel="noopener noreferrer" class="hover:text-white hover:underline">Original video</a>
                     </p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
+                    @if($playlists->isNotEmpty())
+                        <form method="POST" action="{{ route('media.bulk-manage') }}" class="flex">
+                            @csrf
+                            <input type="hidden" name="action" value="add_to_playlist">
+                            <input type="hidden" name="media_ids[]" value="{{ $medium->id }}">
+                            <select name="playlist_id" required class="field rounded-r-none py-2" aria-label="Choose playlist">
+                                <option value="">Playlist</option>
+                                @foreach($playlists as $savedPlaylist)
+                                    <option value="{{ $savedPlaylist->id }}">{{ $savedPlaylist->name }}</option>
+                                @endforeach
+                            </select>
+                            <button class="secondary grid size-10 place-items-center rounded-l-none px-0 text-lg" title="Add to playlist" aria-label="Add to playlist">+</button>
+                        </form>
+                    @else
+                        <a href="{{ route('playlists.index') }}" class="secondary grid size-10 place-items-center px-0 text-lg" title="Create a playlist" aria-label="Create a playlist">+</a>
+                    @endif
                     <a href="{{ route('media.edit', $medium) }}" class="secondary">Edit metadata</a>
                     @if($next)
-                        <a href="{{ route('media.show', ['medium' => $next, 'playlist' => $playlist]) }}" class="secondary">Next video</a>
+                        <a href="{{ $nextUrl }}" class="secondary">Next video</a>
                     @endif
                     @if($medium->status->value !== 'downloaded')
                         <form method="POST" action="{{ route('media.queue', $medium) }}">@csrf<button class="primary">Download</button></form>
@@ -60,10 +76,10 @@
             @endif
         </div>
         <aside>
-            <h2 class="mb-4 font-semibold">{{ $playlist ? 'Up next in '.$playlist->name : 'More from this channel' }}</h2>
+            <h2 class="mb-4 font-semibold">{{ $playlistName ? 'Up next in '.$playlistName : 'More from this channel' }}</h2>
             <div class="grid gap-6">
-                @if($playlist && $next)
-                    <x-video-card :medium="$next" :href="route('media.show', ['medium' => $next, 'playlist' => $playlist])" />
+                @if($playlistName && $next)
+                    <x-video-card :medium="$next" :href="$nextUrl" />
                 @else
                     @foreach($related as $item)<x-video-card :medium="$item" />@endforeach
                 @endif
