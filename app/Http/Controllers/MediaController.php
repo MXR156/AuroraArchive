@@ -100,6 +100,7 @@ class MediaController extends Controller
     public function update(UpdateMediaRequest $request, Media $medium): RedirectResponse
     {
         $metadata = $medium->metadata ?? [];
+        Arr::set($metadata, 'manual.channel_name', true);
         Arr::set($metadata, 'manual.title', true);
         Arr::set($metadata, 'manual.description', true);
         Arr::set($metadata, 'manual.edited_at', now()->toIso8601String());

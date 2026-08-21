@@ -30,16 +30,17 @@ it('preserves manual metadata and download state during later scans', function (
         'youtube_id' => 'video123',
         'title' => 'Manual title',
         'description' => 'Manual description',
+        'channel_name' => 'Manual channel',
         'original_url' => 'https://youtube.com/watch?v=video123',
         'status' => MediaStatus::Downloaded,
-        'metadata' => ['manual' => ['title' => true, 'description' => true], 'tubesync' => ['preserved' => true]],
+        'metadata' => ['manual' => ['channel_name' => true, 'title' => true, 'description' => true], 'tubesync' => ['preserved' => true]],
     ]);
     $youtube = Mockery::mock(YoutubeDownloader::class);
     $youtube->shouldReceive('discover')->once()->andReturn([[
         'id' => 'video123',
         'title' => 'YouTube title',
         'description' => 'YouTube description',
-        'channel' => 'Channel',
+        'channel' => 'YouTube channel',
         'webpage_url' => 'https://youtube.com/watch?v=video123',
     ]]);
 
@@ -48,6 +49,7 @@ it('preserves manual metadata and download state during later scans', function (
     $medium->refresh();
     expect($medium->title)->toBe('Manual title')
         ->and($medium->description)->toBe('Manual description')
+        ->and($medium->channel_name)->toBe('Manual channel')
         ->and($medium->status)->toBe(MediaStatus::Downloaded)
         ->and(data_get($medium->metadata, 'tubesync.preserved'))->toBeTrue();
     Queue::assertNothingPushed();

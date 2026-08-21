@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MediaStatus;
 use App\Jobs\DownloadMedia;
+use App\Jobs\GenerateMediaThumbnail;
 use App\Models\Media;
 use App\Models\MediaFile;
 use App\Models\Source;
@@ -122,6 +123,8 @@ class TubeSyncImporter
                     $this->attachThumbnail($medium, $thumbnailPath);
                     $medium->update(['thumbnail_url' => route('media.thumbnail', $medium, absolute: false)]);
                     $summary['thumbnails']++;
+                } elseif ($mediaPath !== null) {
+                    GenerateMediaThumbnail::dispatch($medium);
                 }
             }
         }
@@ -167,11 +170,14 @@ class TubeSyncImporter
         $description = Arr::get($storedMetadata, 'manual.description')
             ? $medium->description
             : Arr::get($metadata, 'description');
+        $channelName = Arr::get($storedMetadata, 'manual.channel_name')
+            ? $medium->channel_name
+            : (Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader'));
 
         $medium->fill([
             'title' => $title,
             'description' => $description,
-            'channel_name' => Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader'),
+            'channel_name' => $channelName,
             'channel_id' => Arr::get($metadata, 'channel_id') ?: Arr::get($metadata, 'uploader_id'),
             'published_at' => $this->publishedAt($row->published, $metadata),
             'duration_seconds' => $row->duration ?: Arr::get($metadata, 'duration'),

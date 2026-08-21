@@ -6,24 +6,31 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('an authenticated user can edit video title and description', function () {
+test('an authenticated user can edit video channel name title and description', function () {
     $user = User::factory()->create();
     $medium = Media::query()->create([
         'youtube_id' => 'AAAAAAAAAAA',
         'title' => 'Imported title',
         'description' => 'Imported description',
+        'channel_name' => 'Unavailable channel',
         'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
         'metadata' => ['tubesync' => ['preserved' => true]],
     ]);
 
     $this->actingAs($user)
-        ->put(route('media.update', $medium), ['title' => 'Corrected title', 'description' => 'Corrected description'])
+        ->put(route('media.update', $medium), [
+            'channel_name' => 'Archived creator',
+            'title' => 'Corrected title',
+            'description' => 'Corrected description',
+        ])
         ->assertRedirect(route('media.show', $medium))
         ->assertSessionHas('success');
 
     $medium->refresh();
-    expect($medium->title)->toBe('Corrected title')
+    expect($medium->channel_name)->toBe('Archived creator')
+        ->and($medium->title)->toBe('Corrected title')
         ->and($medium->description)->toBe('Corrected description')
+        ->and(data_get($medium->metadata, 'manual.channel_name'))->toBeTrue()
         ->and(data_get($medium->metadata, 'manual.title'))->toBeTrue()
         ->and(data_get($medium->metadata, 'manual.description'))->toBeTrue()
         ->and(data_get($medium->metadata, 'tubesync.preserved'))->toBeTrue();

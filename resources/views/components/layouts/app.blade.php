@@ -17,10 +17,28 @@
             <nav class="nav-menu hidden gap-1 px-3 pb-4 lg:flex lg:flex-col">
                 @foreach([
                     ['home', 'Home'],
-                    ['sources.index', 'Subscriptions'],
-                    ['library', 'Library'],
                     ['channels.index', 'Channels'],
+                    ['library', 'Library'],
+                ] as [$routeName, $label])
+                    <a href="{{ route($routeName) }}" @class([
+                        'rounded-lg px-3 py-2.5 text-sm font-medium',
+                        'bg-white/8 text-white' => request()->routeIs($routeName),
+                        'text-zinc-400 hover:bg-white/5 hover:text-white' => ! request()->routeIs($routeName),
+                    ])>{{ $label }}</a>
+                @endforeach
+                <div class="my-2 border-t border-white/8"></div>
+                @foreach([
                     ['downloads', 'Downloads'],
+                    ['sources.index', 'Subscriptions'],
+                ] as [$routeName, $label])
+                    <a href="{{ route($routeName) }}" @class([
+                        'rounded-lg px-3 py-2.5 text-sm font-medium',
+                        'bg-white/8 text-white' => request()->routeIs($routeName),
+                        'text-zinc-400 hover:bg-white/5 hover:text-white' => ! request()->routeIs($routeName),
+                    ])>{{ $label }}</a>
+                @endforeach
+                <div class="my-2 border-t border-white/8"></div>
+                @foreach([
                     ['settings', 'Settings'],
                     ['system-health', 'System Health'],
                 ] as [$routeName, $label])

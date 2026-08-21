@@ -9,6 +9,10 @@
             @csrf
             @method('PUT')
             <label class="grid gap-2 text-sm font-medium">
+                Channel name
+                <input name="channel_name" value="{{ old('channel_name', $medium->channel_name) }}" maxlength="255" class="field">
+            </label>
+            <label class="grid gap-2 text-sm font-medium">
                 Title
                 <input name="title" value="{{ old('title', $medium->title) }}" required maxlength="255" class="field">
             </label>

@@ -54,3 +54,21 @@ test('the thumbnail endpoint falls back to youtube when local extraction is unav
 
     Queue::assertPushed(GenerateMediaThumbnail::class, fn (GenerateMediaThumbnail $job): bool => $job->media->is($medium));
 });
+
+test('a thumbnail sharing the local video filename is resolved without a youtube id', function () {
+    $root = storage_path('framework/testing/media-thumbnail-sidecar');
+    File::ensureDirectoryExists($root.'/channel');
+    config()->set('auroraarchive.media_root', $root);
+    $medium = Media::query()->create([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'title' => 'TubeSync sidecar thumbnail',
+        'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
+    ]);
+    File::put($root.'/channel/saved-video.mkv', 'video');
+    File::put($root.'/channel/saved-video.jpg', 'thumbnail');
+    $medium->files()->create(['path' => 'channel/saved-video.mkv']);
+
+    expect(app(MediaThumbnail::class)->path($medium))->toBe(realpath($root.'/channel/saved-video.jpg'));
+
+    File::deleteDirectory($root);
+});

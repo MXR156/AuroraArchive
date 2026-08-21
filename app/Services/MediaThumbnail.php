@@ -26,8 +26,10 @@ class MediaThumbnail
         $sidecarPath = collect(scandir(dirname($mediaPath)) ?: [])
             ->first(function (string $candidate) use ($media, $mediaPath): bool {
                 $extension = Str::lower(pathinfo($candidate, PATHINFO_EXTENSION));
+                $mediaName = pathinfo($mediaPath, PATHINFO_FILENAME);
+                $candidateName = pathinfo($candidate, PATHINFO_FILENAME);
 
-                return Str::contains($candidate, $media->youtube_id)
+                return (Str::contains($candidate, $media->youtube_id) || Str::startsWith($candidateName, $mediaName))
                     && in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'avif'], true)
                     && is_file(dirname($mediaPath).DIRECTORY_SEPARATOR.$candidate);
             });
@@ -57,6 +59,9 @@ class MediaThumbnail
         $cachePath = $this->cachePath($media, $mediaPath);
         try {
             $this->extractAttachment($mediaPath, $cachePath);
+            if (! is_file($cachePath) || filesize($cachePath) === 0) {
+                $this->extractAttachedPicture($mediaPath, $cachePath);
+            }
             if (! is_file($cachePath) || filesize($cachePath) === 0) {
                 $this->extractFrame($mediaPath, $cachePath);
             }
@@ -106,6 +111,7 @@ class MediaThumbnail
 
     private function extractAttachment(string $mediaPath, string $cachePath): void
     {
+        $this->removeEmptyCacheFile($cachePath);
         $process = new Process([
             (string) config('auroraarchive.ffmpeg'), '-y', '-dump_attachment:t:0', $cachePath,
             '-i', $mediaPath, '-t', '0', '-f', 'null', '-',
@@ -113,12 +119,30 @@ class MediaThumbnail
         $process->setTimeout(10)->run();
     }
 
+    private function extractAttachedPicture(string $mediaPath, string $cachePath): void
+    {
+        $this->removeEmptyCacheFile($cachePath);
+        $process = new Process([
+            (string) config('auroraarchive.ffmpeg'), '-y', '-i', $mediaPath,
+            '-map', '0:v:disp:attached_pic?', '-frames:v', '1', '-vf', 'scale=640:-2', $cachePath,
+        ]);
+        $process->setTimeout(15)->run();
+    }
+
     private function extractFrame(string $mediaPath, string $cachePath): void
     {
+        $this->removeEmptyCacheFile($cachePath);
         $process = new Process([
             (string) config('auroraarchive.ffmpeg'), '-y', '-ss', '00:00:03', '-i', $mediaPath,
             '-frames:v', '1', '-vf', 'scale=640:-2', $cachePath,
         ]);
         $process->setTimeout(20)->run();
+    }
+
+    private function removeEmptyCacheFile(string $cachePath): void
+    {
+        if (is_file($cachePath) && filesize($cachePath) === 0) {
+            unlink($cachePath);
+        }
     }
 }

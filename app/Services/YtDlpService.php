@@ -114,7 +114,7 @@ class YtDlpService implements YoutubeDownloader
                 $arguments = ['--cookies', $cookiePath, ...$arguments];
             }
             $process = new Process([config('auroraarchive.yt_dlp'), ...$arguments]);
-            $process->setEnv(['TMPDIR' => $tempRoot, 'TMP' => $tempRoot, 'TEMP' => $tempRoot, 'PYTHONHASHSEED' => '0']);
+            $process->setEnv($this->processEnvironment($tempRoot));
             $process->setTimeout($timeout)->run();
 
             return [
@@ -127,6 +127,34 @@ class YtDlpService implements YoutubeDownloader
                 unlink($cookiePath);
             }
         }
+    }
+
+    /** @return array<string, string> */
+    private function processEnvironment(string $tempRoot): array
+    {
+        $environment = [
+            'TMPDIR' => $tempRoot,
+            'TMP' => $tempRoot,
+            'TEMP' => $tempRoot,
+            'PYTHONHASHSEED' => '0',
+        ];
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            return $environment;
+        }
+
+        $systemRoot = getenv('SYSTEMROOT') ?: getenv('SystemRoot') ?: getenv('WINDIR') ?: getenv('windir') ?: 'C:\\Windows';
+        $environment['SYSTEMROOT'] = $systemRoot;
+        $environment['WINDIR'] = $systemRoot;
+
+        foreach (['PATH', 'COMSPEC', 'PATHEXT'] as $name) {
+            $value = getenv($name);
+            if (is_string($value) && $value !== '') {
+                $environment[$name] = $value;
+            }
+        }
+
+        return $environment;
     }
 
     private function cookiesFor(?int $userId): ?string

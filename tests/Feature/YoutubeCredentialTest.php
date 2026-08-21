@@ -2,6 +2,7 @@
 
 use App\Contracts\YoutubeDownloader;
 use App\Models\User;
+use App\Services\YtDlpService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -39,4 +40,19 @@ it('only permits supported yt-dlp release channels', function () {
     $this->actingAs($user)
         ->post(route('settings.yt-dlp.update'), ['channel' => 'untrusted/repository'])
         ->assertSessionHasErrors('channel');
+});
+
+it('provides the runtime environment required by the yt-dlp executable', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'processEnvironment');
+    $environment = $method->invoke(app(YtDlpService::class), storage_path('app/tmp'));
+
+    expect($environment)
+        ->toHaveKeys(['TMPDIR', 'TMP', 'TEMP', 'PYTHONHASHSEED'])
+        ->and($environment['PYTHONHASHSEED'])->toBe('0');
+
+    if (PHP_OS_FAMILY === 'Windows') {
+        expect($environment)
+            ->toHaveKeys(['SYSTEMROOT', 'WINDIR'])
+            ->and($environment['SYSTEMROOT'])->not->toBeEmpty();
+    }
 });

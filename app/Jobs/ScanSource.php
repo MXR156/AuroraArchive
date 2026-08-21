@@ -41,7 +41,7 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
                 'source_id' => $isNew ? $this->source->id : $medium->source_id,
                 'title' => Arr::get($metadata, 'manual.title') ? $medium->title : (string) ($entry['title'] ?? $entry['id']),
                 'description' => Arr::get($metadata, 'manual.description') ? $medium->description : Arr::get($entry, 'description'),
-                'channel_name' => Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader'),
+                'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $medium->channel_name : (Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader')),
                 'channel_id' => Arr::get($entry, 'channel_id'),
                 'published_at' => filled(Arr::get($entry, 'timestamp')) ? now()->setTimestamp((int) Arr::get($entry, 'timestamp')) : null,
                 'duration_seconds' => Arr::get($entry, 'duration'),
