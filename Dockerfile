@@ -14,8 +14,8 @@ RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --opt
 
 FROM php:8.5-fpm-bookworm
 ARG TARGETARCH
-RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor ffmpeg curl unzip procps libzip-dev libicu-dev ca-certificates \
-    && docker-php-ext-install pdo_mysql intl opcache pcntl zip \
+RUN apt-get update && apt-get install -y --no-install-recommends nginx supervisor ffmpeg curl unzip procps libzip-dev libicu-dev libsqlite3-dev ca-certificates \
+    && docker-php-ext-install pdo_mysql pdo_sqlite intl opcache pcntl zip \
     && case "$TARGETARCH" in amd64) YTDLP_ARCH=""; DENO_ARCH="x86_64" ;; arm64) YTDLP_ARCH="_aarch64"; DENO_ARCH="aarch64" ;; *) exit 1 ;; esac \
     && curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux${YTDLP_ARCH}" -o /usr/local/bin/yt-dlp \
     && chmod 0755 /usr/local/bin/yt-dlp \

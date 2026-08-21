@@ -25,7 +25,9 @@ class SystemHealthController extends Controller
         try {
             DB::connection()->getPdo();
 
-            return ['name' => 'MySQL', 'value' => 'Connected', 'healthy' => true];
+            $driver = DB::connection()->getDriverName();
+
+            return ['name' => 'Database', 'value' => ucfirst($driver).' connected', 'healthy' => true];
         } catch (Throwable $e) {
             return ['name' => 'Database', 'value' => $e->getMessage(), 'healthy' => false];
         }
