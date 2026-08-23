@@ -25,6 +25,7 @@ class ApplyMediaFilters
             'watched' => $query->whereHas('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
             'unwatched' => $query->whereDoesntHave('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
             'discovered' => $query->where('status', MediaStatus::Discovered),
+            'active_downloads' => $query->whereIn('status', [MediaStatus::Queued, MediaStatus::Downloading]),
             'queued' => $query->where('status', MediaStatus::Queued),
             'downloading' => $query->where('status', MediaStatus::Downloading),
             'failed' => $query->where('status', MediaStatus::Failed),

@@ -56,9 +56,7 @@ class Media extends Model
 
     public function youtubeVideoUrl(): string
     {
-        return $this->isYoutubeUrl($this->original_url)
-            ? $this->original_url
-            : 'https://www.youtube.com/watch?v='.$this->youtube_id;
+        return 'https://www.youtube.com/watch?v='.$this->youtube_id;
     }
 
     public function archiveChannelKey(): string

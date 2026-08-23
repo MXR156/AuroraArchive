@@ -34,11 +34,31 @@ class YtDlpService implements YoutubeDownloader
     {
         $directory = $this->destination($media);
         $template = $directory.'/%(upload_date>%Y-%m-%d)s - %(title).160B [%(id)s].%(ext)s';
-        $result = $this->run(['--newline', '--no-playlist', '--embed-thumbnail', '--merge-output-format', 'mkv', '-o', $template, $media->original_url], $this->cookiesFor($media->source?->user_id), 7200);
+        $arguments = ['--newline', '--no-playlist', '--embed-thumbnail', '--merge-output-format', 'mkv', '-o', $template, $media->youtubeVideoUrl()];
+        $cookies = $this->cookiesFor($media->source?->user_id);
+        $result = $this->run($arguments, $cookies, 7200);
+        if (filled($cookies) && $this->requiresUnauthenticatedRetry($result)) {
+            $retry = $this->run($arguments, null, 7200);
+            if ($retry['exit_code'] === 0) {
+                $result = $retry;
+            } else {
+                $result['stderr'] .= PHP_EOL.'Unauthenticated retry:'.PHP_EOL.$retry['stderr'];
+            }
+        }
         $result['files'] = array_values(array_filter(glob($directory.'/*') ?: [], fn (string $path): bool => Str::contains(basename($path), '['.$media->youtube_id.']')));
         $result['version'] = $this->version();
 
         return $result;
+    }
+
+    /** @param array{exit_code:int,stdout:string,stderr:string} $result */
+    private function requiresUnauthenticatedRetry(array $result): bool
+    {
+        return $result['exit_code'] !== 0
+            && Str::contains(Str::lower($result['stderr']), [
+                'playback on other websites has been disabled',
+                'embedding disabled',
+            ]);
     }
 
     public function testAuthentication(string $cookies): array

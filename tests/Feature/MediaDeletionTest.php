@@ -3,6 +3,7 @@
 use App\Enums\MediaStatus;
 use App\Models\Media;
 use App\Models\MediaFile;
+use App\Models\MediaTombstone;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -34,7 +35,8 @@ test('an authenticated user can permanently delete media and matching files', fu
 
     $this->assertModelMissing($medium);
     expect(File::exists($videoPath))->toBeFalse()
-        ->and(File::exists($thumbnailPath))->toBeFalse();
+        ->and(File::exists($thumbnailPath))->toBeFalse()
+        ->and(MediaTombstone::query()->where('youtube_id', 'AAAAAAAAAAA')->where('reason', 'deleted_by_user')->exists())->toBeTrue();
 
     File::deleteDirectory($root);
 });

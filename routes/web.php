@@ -25,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/subscriptions', [SourceController::class, 'store'])->name('sources.store');
     Route::post('/subscriptions/{source}/scan', [SourceController::class, 'scan'])->name('sources.scan');
     Route::patch('/subscriptions/{source}/toggle', [SourceController::class, 'toggle'])->name('sources.toggle');
+    Route::patch('/subscriptions/{source}/schedule', [SourceController::class, 'updateSchedule'])->name('sources.schedule');
     Route::delete('/subscriptions/{source}', [SourceController::class, 'destroy'])->name('sources.destroy');
     Route::get('/library', LibraryController::class)->name('library');
     Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
@@ -34,7 +35,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/playlists/{playlist}', [PlaylistController::class, 'destroy'])->name('playlists.destroy');
     Route::get('/channels', [ChannelController::class, 'index'])->name('channels.index');
     Route::get('/channels/{channel}', [ChannelController::class, 'show'])->name('channels.show');
-    Route::get('/downloads', fn () => redirect()->route('library', ['filter' => 'downloading']))->name('downloads');
+    Route::get('/downloads', fn () => redirect()->route('library', ['filter' => 'active_downloads']))->name('downloads');
     Route::get('/watch/{medium}', [MediaController::class, 'show'])->name('media.show');
     Route::get('/media/{medium}/edit', [MediaController::class, 'edit'])->name('media.edit');
     Route::post('/media/bulk', [MediaController::class, 'bulkManage'])->name('media.bulk-manage');

@@ -7,6 +7,7 @@ use App\Jobs\DownloadMedia;
 use App\Jobs\GenerateMediaThumbnail;
 use App\Models\Media;
 use App\Models\MediaFile;
+use App\Models\MediaTombstone;
 use App\Models\Source;
 use App\Models\User;
 use Illuminate\Support\Arr;
@@ -32,7 +33,7 @@ class TubeSyncImporter
     public function preview(User $user): array
     {
         $sources = $this->sourceRows();
-        $media = $this->mediaRows($sources->pluck('uuid')->map(fn (mixed $uuid): string => (string) $uuid)->all());
+        $media = $this->withoutTombstones($this->mediaRows($sources->pluck('uuid')->map(fn (mixed $uuid): string => (string) $uuid)->all()));
         $this->youtubeIds = $media->pluck('key')->map(fn (mixed $key): string => (string) $key)->unique()->values()->all();
         $localSourceKeys = $user->sources()->get(['type', 'external_id'])->map(fn (Source $source): string => $source->type.':'.$source->external_id)->all();
         $groupedMedia = $media->groupBy('source_id');
@@ -79,7 +80,7 @@ class TubeSyncImporter
         }
 
         $summary = ['sources' => 0, 'media' => 0, 'files' => 0, 'thumbnails' => 0, 'queued' => 0, 'metadata_only' => 0];
-        $allRows = $this->mediaRows($sources->pluck('uuid')->map(fn (mixed $uuid): string => (string) $uuid)->all());
+        $allRows = $this->withoutTombstones($this->mediaRows($sources->pluck('uuid')->map(fn (mixed $uuid): string => (string) $uuid)->all()));
         $this->youtubeIds = $allRows->pluck('key')->map(fn (mixed $key): string => (string) $key)->unique()->values()->all();
         foreach ($sources as $tubeSyncSource) {
             $source = $this->importSource($user, $tubeSyncSource);
@@ -246,6 +247,24 @@ class TubeSyncImporter
         }
 
         return DB::connection('tubesync')->table('sync_media')->whereIn('source_id', $sourceUuids)->orderBy('created')->get();
+    }
+
+    /** @param Collection<int, object> $rows @return Collection<int, object> */
+    private function withoutTombstones(Collection $rows): Collection
+    {
+        $youtubeIds = $rows->pluck('key')->map(fn (mixed $key): string => (string) $key)->unique()->values();
+        if ($youtubeIds->isEmpty()) {
+            return $rows;
+        }
+
+        $tombstones = $youtubeIds
+            ->chunk(1000)
+            ->flatMap(fn (Collection $chunk): Collection => MediaTombstone::query()
+                ->whereIn('youtube_id', $chunk->all())
+                ->pluck('youtube_id'))
+            ->all();
+
+        return $rows->reject(fn (object $row): bool => in_array((string) $row->key, $tombstones, true))->values();
     }
 
     /** @return Collection<string, array<string, mixed>> */

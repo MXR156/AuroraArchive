@@ -48,6 +48,23 @@ test('the library supports status filtering and title sorting', function () {
         ->assertDontSee('Failed video');
 });
 
+test('the downloads page includes queued and downloading media', function () {
+    $user = User::factory()->create();
+    filterableMedium('AAAAAAAAAAA', 'Queued video', MediaStatus::Queued, false);
+    filterableMedium('BBBBBBBBBBB', 'Downloading video', MediaStatus::Downloading, false);
+    filterableMedium('CCCCCCCCCCC', 'Failed video', MediaStatus::Failed, false);
+
+    $this->actingAs($user)
+        ->get(route('downloads'))
+        ->assertRedirect(route('library', ['filter' => 'active_downloads']));
+
+    $this->get(route('library', ['filter' => 'active_downloads']))
+        ->assertOk()
+        ->assertSee('Queued video')
+        ->assertSee('Downloading video')
+        ->assertDontSee('Failed video');
+});
+
 test('the library can sort by the most recently downloaded file', function () {
     $user = User::factory()->create();
     $older = filterableMedium('AAAAAAAAAAA', 'Older download', MediaStatus::Downloaded, true);

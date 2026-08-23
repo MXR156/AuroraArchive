@@ -36,3 +36,29 @@ it('rejects a youtube URL that does not match the selected source type', functio
     expect($user->sources()->exists())->toBeFalse();
     Queue::assertNothingPushed();
 });
+
+it('allows an owner to change a source scan interval', function () {
+    $user = User::factory()->create();
+    $source = $user->sources()->create(['type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+
+    $this->actingAs($user)
+        ->patch(route('sources.schedule', $source), ['scan_interval_minutes' => 180])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($source->refresh()->scan_interval_minutes)->toBe(180)
+        ->and($source->next_scan_at)->not->toBeNull();
+});
+
+it('rejects invalid or unauthorised source schedule changes', function () {
+    $owner = User::factory()->create();
+    $source = $owner->sources()->create(['type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+
+    $this->actingAs($owner)
+        ->patch(route('sources.schedule', $source), ['scan_interval_minutes' => 5])
+        ->assertSessionHasErrors('scan_interval_minutes');
+
+    $this->actingAs(User::factory()->create())
+        ->patch(route('sources.schedule', $source), ['scan_interval_minutes' => 60])
+        ->assertForbidden();
+});

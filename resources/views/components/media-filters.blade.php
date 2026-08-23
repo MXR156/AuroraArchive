@@ -8,6 +8,7 @@
             'not_downloaded' => 'Not downloaded',
             'skipped' => 'Skipped',
             'failed' => 'Failed',
+            'active_downloads' => 'Queued or downloading',
             'queued' => 'Queued',
             'downloading' => 'Downloading',
             'discovered' => 'Discovered',

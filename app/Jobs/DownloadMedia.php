@@ -72,7 +72,16 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
         $error = Str::lower($error);
 
         return match (true) {
-            Str::contains($error, ['sign in', 'cookies']) => 'Authentication', Str::contains($error, ['429', 'too many requests']) => 'Rate limiting', Str::contains($error, ['private', 'unavailable']) => 'Unavailable/private', Str::contains($error, ['dns', 'network', 'timed out']) => 'Network', Str::contains($error, ['javascript', 'deno']) => 'JavaScript challenge', Str::contains($error, ['ffmpeg']) => 'FFmpeg', Str::contains($error, ['permission denied', 'no space']) => 'Filesystem', Str::contains($error, ['extractor']) => 'Extractor', default => 'Unknown'
+            Str::contains($error, ['sign in', 'cookies']) => 'Authentication',
+            Str::contains($error, ['429', 'too many requests']) => 'Rate limiting',
+            Str::contains($error, ['playback on other websites has been disabled', 'embedding disabled']) => 'Playback restricted',
+            Str::contains($error, ['private', 'unavailable']) => 'Unavailable/private',
+            Str::contains($error, ['dns', 'network', 'timed out']) => 'Network',
+            Str::contains($error, ['javascript', 'deno']) => 'JavaScript challenge',
+            Str::contains($error, ['ffmpeg']) => 'FFmpeg',
+            Str::contains($error, ['permission denied', 'no space']) => 'Filesystem',
+            Str::contains($error, ['extractor']) => 'Extractor',
+            default => 'Unknown'
         };
     }
 }

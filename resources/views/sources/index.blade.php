@@ -35,13 +35,28 @@
                             <span class="badge">{{ $source->enabled ? 'Enabled' : 'Paused' }}</span>
                         </div>
                         <p class="mt-1 text-sm text-zinc-500">
-                            {{ ucfirst($source->type) }} &middot; {{ $source->playlist_media_count }} items &middot; {{ $source->last_scanned_at?->diffForHumans() ?? 'Never scanned' }}
+                            {{ ucfirst($source->type) }} &middot; {{ $source->playlist_media_count }} items &middot; {{ $source->last_scanned_at?->diffForHumans() ?? 'Never scanned' }} &middot; every {{ $source->scan_interval_minutes < 60 ? $source->scan_interval_minutes.' minutes' : ($source->scan_interval_minutes % 1440 === 0 ? ($source->scan_interval_minutes / 1440).' days' : ($source->scan_interval_minutes / 60).' hours') }}
                         </p>
                         @if($source->last_scan_error)
                             <p class="mt-2 text-xs text-red-300">{{ $source->last_scan_error }}</p>
                         @endif
                     </div>
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <form method="POST" action="{{ route('sources.schedule', $source) }}" class="flex items-center gap-2">
+                            @csrf
+                            @method('PATCH')
+                            <label class="sr-only" for="scan-interval-{{ $source->id }}">Scan interval</label>
+                            <select id="scan-interval-{{ $source->id }}" name="scan_interval_minutes" class="field w-auto py-2 text-sm">
+                                @php($scanIntervals = [15 => '15 min', 30 => '30 min', 60 => '1 hour', 180 => '3 hours', 360 => '6 hours', 720 => '12 hours', 1440 => '24 hours', 2880 => '2 days', 10080 => '7 days'])
+                                @if(! array_key_exists($source->scan_interval_minutes, $scanIntervals))
+                                    <option value="{{ $source->scan_interval_minutes }}" selected>{{ $source->scan_interval_minutes }} min</option>
+                                @endif
+                                @foreach($scanIntervals as $minutes => $label)
+                                    <option value="{{ $minutes }}" @selected($source->scan_interval_minutes === $minutes)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <button class="secondary">Save interval</button>
+                        </form>
                         <a href="{{ route('sources.show', $source) }}" class="secondary">View</a>
                         <form method="POST" action="{{ route('sources.scan', $source) }}">
                             @csrf

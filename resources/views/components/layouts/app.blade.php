@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/auroraarchive-32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/auroraarchive-16.png') }}">
+    <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('images/auroraarchive-192.png') }}">
+    <link rel="manifest" href="{{ asset('site.webmanifest') }}">
     <title>{{ isset($title) ? $title.' - ' : '' }}AuroraArchive</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -11,7 +16,7 @@
     <div class="min-h-screen lg:grid lg:grid-cols-[15rem_1fr]">
         <aside class="border-b border-white/8 bg-zinc-950 lg:fixed lg:inset-y-0 lg:w-60 lg:border-r lg:border-b-0">
             <div class="flex h-16 items-center justify-between px-5">
-                <a href="{{ route('home') }}" class="flex items-center gap-3 font-semibold"><span class="grid size-9 place-items-center rounded-lg bg-violet-600">AA</span>AuroraArchive</a>
+                <a href="{{ route('home') }}" class="flex items-center gap-3 font-semibold"><img src="{{ asset('images/auroraarchive-192.png') }}" alt="" class="size-10 object-contain">AuroraArchive</a>
                 <button class="nav-toggle secondary px-2.5 lg:hidden" type="button" aria-label="Toggle navigation">Menu</button>
             </div>
             <nav class="nav-menu hidden gap-1 px-3 pb-4 lg:flex lg:flex-col">

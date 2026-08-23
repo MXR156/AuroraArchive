@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreSourceRequest;
+use App\Http\Requests\UpdateSourceScheduleRequest;
 use App\Jobs\ScanSource;
 use App\Models\Source;
 use App\Services\ApplyMediaFilters;
@@ -51,6 +52,18 @@ class SourceController extends Controller
         $source->update(['enabled' => ! $source->enabled]);
 
         return back()->with('success', 'Source updated.');
+    }
+
+    public function updateSchedule(UpdateSourceScheduleRequest $request, Source $source): RedirectResponse
+    {
+        $this->owned($request, $source);
+        $minutes = (int) $request->validated('scan_interval_minutes');
+        $source->update([
+            'scan_interval_minutes' => $minutes,
+            'next_scan_at' => now()->addMinutes($minutes),
+        ]);
+
+        return back()->with('success', 'Scan interval updated.');
     }
 
     public function destroy(Request $request, Source $source): RedirectResponse

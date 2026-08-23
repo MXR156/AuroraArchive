@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Media;
+use App\Models\MediaTombstone;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -23,6 +24,10 @@ class DeleteMedia
             }
         }
 
+        MediaTombstone::query()->updateOrCreate(
+            ['youtube_id' => $media->youtube_id],
+            ['reason' => 'deleted_by_user'],
+        );
         $media->delete();
     }
 

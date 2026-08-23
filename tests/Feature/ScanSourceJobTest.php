@@ -5,6 +5,7 @@ use App\Enums\MediaStatus;
 use App\Jobs\DownloadMedia;
 use App\Jobs\ScanSource;
 use App\Models\Media;
+use App\Models\MediaTombstone;
 use App\Models\Source;
 use App\Models\User;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -53,4 +54,57 @@ it('preserves manual metadata and download state during later scans', function (
         ->and($medium->status)->toBe(MediaStatus::Downloaded)
         ->and(data_get($medium->metadata, 'tubesync.preserved'))->toBeTrue();
     Queue::assertNothingPushed();
+});
+
+it('records unavailable playlist entries without queueing them', function () {
+    Queue::fake();
+    $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1', 'auto_download' => true]);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('discover')->once()->andReturn([['id' => 'unavailable1', 'title' => '[Deleted video]', 'availability' => 'unavailable']]);
+
+    (new ScanSource($source))->handle($youtube);
+
+    $medium = Media::query()->where('youtube_id', 'unavailable1')->firstOrFail();
+    expect($medium->status)->toBe(MediaStatus::Failed)
+        ->and(data_get($medium->metadata, 'youtube.unavailable'))->toBeTrue()
+        ->and($source->playlistMedia()->whereKey($medium->id)->exists())->toBeTrue();
+    Queue::assertNothingPushed();
+});
+
+it('does not downgrade an archived video when youtube later reports it unavailable', function () {
+    Queue::fake();
+    $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+    $medium = Media::query()->create([
+        'source_id' => $source->id,
+        'youtube_id' => 'archived123',
+        'title' => 'Archived title',
+        'description' => 'Archived description',
+        'channel_name' => 'Archived channel',
+        'original_url' => 'https://www.youtube.com/watch?v=archived123',
+        'status' => MediaStatus::Downloaded,
+    ]);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('discover')->once()->andReturn([['id' => 'archived123', 'title' => '[Private video]', 'availability' => 'private']]);
+
+    (new ScanSource($source))->handle($youtube);
+
+    $medium->refresh();
+    expect($medium->status)->toBe(MediaStatus::Downloaded)
+        ->and($medium->title)->toBe('Archived title')
+        ->and($medium->description)->toBe('Archived description')
+        ->and($medium->channel_name)->toBe('Archived channel')
+        ->and(data_get($medium->metadata, 'youtube.unavailable'))->toBeTrue();
+});
+
+it('ignores deliberately deleted media IDs during later scans', function () {
+    Queue::fake();
+    $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+    MediaTombstone::factory()->create(['youtube_id' => 'deleted1234']);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('discover')->once()->andReturn([['id' => 'deleted1234', 'title' => '[Deleted video]', 'availability' => 'unavailable']]);
+
+    (new ScanSource($source))->handle($youtube);
+
+    expect(Media::query()->where('youtube_id', 'deleted1234')->exists())->toBeFalse()
+        ->and($source->playlistMedia()->exists())->toBeFalse();
 });
