@@ -36,6 +36,28 @@ test('the library filters downloaded and not downloaded media using registered f
         ->assertOk()->assertSee('Missing video')->assertDontSee('Downloaded video');
 });
 
+test('the library can find archived videos reported unavailable by youtube', function () {
+    $user = User::factory()->create();
+    $archived = filterableMedium('AAAAAAAAAAA', 'Preserved removed video', MediaStatus::Downloaded, true);
+    $archived->update(['metadata' => ['youtube' => ['unavailable' => true]]]);
+    $available = filterableMedium('BBBBBBBBBBB', 'Available archived video', MediaStatus::Downloaded, true);
+    $placeholder = filterableMedium('CCCCCCCCCCC', 'Unavailable without archive', MediaStatus::Failed, false);
+    $placeholder->update(['metadata' => ['youtube' => ['unavailable' => true]]]);
+
+    $this->actingAs($user)
+        ->get(route('library', ['filter' => 'youtube_unavailable']))
+        ->assertOk()
+        ->assertSee('Preserved removed video')
+        ->assertSee('Removed from YouTube')
+        ->assertDontSee('Available archived video')
+        ->assertDontSee('Unavailable without archive');
+
+    $this->get(route('media.show', $archived))
+        ->assertOk()
+        ->assertSee('Removed from YouTube')
+        ->assertSee('archived copy preserved');
+});
+
 test('the library supports status filtering and title sorting', function () {
     $user = User::factory()->create();
     filterableMedium('AAAAAAAAAAA', 'Zulu skipped', MediaStatus::Skipped, false);

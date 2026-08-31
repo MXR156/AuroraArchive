@@ -59,7 +59,10 @@ test('playlist playback exposes the next item and preserves playlist context', f
         ->assertSee('Next video')
         ->assertSee('https://www.youtube.com/channel/UC123456789', escape: false)
         ->assertSee('https://www.youtube.com/watch?v=AAAAAAAAAAA', escape: false)
-        ->assertSee('Original video')
+        ->assertSee(route('channels.show', $first->archiveChannelKey()), escape: false)
+        ->assertSee('Archive Channel')
+        ->assertSee('Original Video')
+        ->assertSee('Original Channel')
         ->assertSee(route('media.show', ['medium' => $second, 'playlist' => $playlist]), escape: false);
 });
 

@@ -5,6 +5,7 @@
         @foreach([
             '' => 'All media',
             'downloaded' => 'Downloaded files',
+            'youtube_unavailable' => 'Removed from YouTube (archived)',
             'not_downloaded' => 'Not downloaded',
             'skipped' => 'Skipped',
             'failed' => 'Failed',

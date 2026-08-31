@@ -19,14 +19,19 @@
             <div class="mt-5 flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h1 class="text-2xl font-bold">{{ $medium->title }}</h1>
+                    @if($medium->isUnavailableOnYoutube() && $medium->files->isNotEmpty())
+                        <p class="mt-2 inline-flex rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200">Removed from YouTube &middot; archived copy preserved</p>
+                    @endif
                     <p class="mt-2 text-sm text-zinc-400">
+                        @if($medium->channel_name)
+                            <a href="{{ route('channels.show', $medium->archiveChannelKey()) }}" class="hover:text-white hover:underline">Archive Channel</a>
+                            &middot;
+                        @endif
+                        <a href="{{ $medium->youtubeVideoUrl() }}" target="_blank" rel="noopener noreferrer" class="hover:text-white hover:underline">Original Video</a>
                         @if($medium->youtubeChannelUrl())
-                            <a href="{{ $medium->youtubeChannelUrl() }}" target="_blank" rel="noopener noreferrer" class="hover:text-white hover:underline">{{ $medium->channel_name ?: 'YouTube channel' }}</a>
-                        @else
-                            {{ $medium->channel_name }}
+                            &middot; <a href="{{ $medium->youtubeChannelUrl() }}" target="_blank" rel="noopener noreferrer" class="hover:text-white hover:underline">Original Channel</a>
                         @endif
                         @if($medium->published_at) &middot; {{ $medium->published_at->toFormattedDateString() }} @endif
-                        &middot; <a href="{{ $medium->youtubeVideoUrl() }}" target="_blank" rel="noopener noreferrer" class="hover:text-white hover:underline">Original video</a>
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-2">

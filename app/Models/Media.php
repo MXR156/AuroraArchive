@@ -59,6 +59,11 @@ class Media extends Model
         return 'https://www.youtube.com/watch?v='.$this->youtube_id;
     }
 
+    public function isUnavailableOnYoutube(): bool
+    {
+        return (bool) Arr::get($this->metadata, 'youtube.unavailable', false);
+    }
+
     public function archiveChannelKey(): string
     {
         if (filled($this->channel_id)) {

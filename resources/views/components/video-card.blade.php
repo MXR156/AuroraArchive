@@ -11,6 +11,9 @@
             <span class="absolute right-2 bottom-2 rounded bg-black/85 px-1.5 py-0.5 text-xs">{{ sprintf('%d:%02d', intdiv($medium->duration_seconds, 60), $medium->duration_seconds % 60) }}</span>
         @endif
         <span class="absolute top-2 left-2 rounded bg-black/80 px-2 py-1 text-[10px] font-semibold uppercase">{{ $medium->status->value }}</span>
+        @if($medium->isUnavailableOnYoutube() && $medium->status->value === 'downloaded')
+            <span class="absolute bottom-2 left-2 rounded bg-amber-950/95 px-2 py-1 text-[10px] font-semibold uppercase text-amber-200" title="YouTube reported this video unavailable; your archived copy is preserved.">Removed from YouTube</span>
+        @endif
     </a>
     <div class="pt-3">
         <a href="{{ $href ?: route('media.show', $medium) }}" class="line-clamp-2 text-sm font-semibold leading-5">{{ $medium->title }}</a>

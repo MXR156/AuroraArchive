@@ -21,6 +21,9 @@ class ApplyMediaFilters
         $filter = $request->string('filter')->toString() ?: $request->string('status')->toString();
         match ($filter) {
             'downloaded' => $query->whereHas('files'),
+            'youtube_unavailable' => $query
+                ->whereHas('files')
+                ->where('metadata->youtube->unavailable', true),
             'not_downloaded' => $query->whereDoesntHave('files'),
             'watched' => $query->whereHas('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
             'unwatched' => $query->whereDoesntHave('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
