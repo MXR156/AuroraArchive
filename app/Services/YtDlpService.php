@@ -34,7 +34,20 @@ class YtDlpService implements YoutubeDownloader
     {
         $directory = $this->destination($media);
         $template = $directory.'/%(upload_date>%Y-%m-%d)s - %(title).160B [%(id)s].%(ext)s';
-        $arguments = ['--newline', '--no-playlist', '--embed-thumbnail', '--merge-output-format', 'mkv', '-o', $template, $media->youtubeVideoUrl()];
+        $arguments = [
+            '--newline',
+            '--no-playlist',
+            '--format',
+            'bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1][ext=mp4]/bestvideo+bestaudio/best',
+            '--embed-thumbnail',
+            '--merge-output-format',
+            'mp4',
+            '--postprocessor-args',
+            'Merger+ffmpeg_o:-movflags +faststart',
+            '-o',
+            $template,
+            $media->youtubeVideoUrl(),
+        ];
         $cookies = $this->cookiesFor($media->source?->user_id);
         $result = $this->run($arguments, $cookies, 7200);
         if (filled($cookies) && $this->requiresUnauthenticatedRetry($result)) {

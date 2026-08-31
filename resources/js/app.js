@@ -17,6 +17,20 @@ document.querySelectorAll('.media-player').forEach((player) => {
         if (player.dataset.nextUrl) window.location.assign(player.dataset.nextUrl);
     });
 });
+document.addEventListener('click', (event) => {
+    const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+    if (!link || link.target === '_blank' || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+
+    const destination = new URL(link.href, window.location.href);
+    if (destination.origin !== window.location.origin || (destination.pathname === window.location.pathname && destination.search === window.location.search && destination.hash)) return;
+
+    document.querySelectorAll('.media-player').forEach((player) => {
+        player.pause();
+        player.removeAttribute('src');
+        player.querySelectorAll('source').forEach((source) => source.removeAttribute('src'));
+        player.load();
+    });
+}, { capture: true });
 document.querySelectorAll('[data-bulk-media-form]').forEach((form) => {
     const checkboxes = [...form.querySelectorAll('input[name="media_ids[]"]')];
     const toolbar = form.querySelector('[data-bulk-toolbar]');

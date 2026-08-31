@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Response;
 use Illuminate\View\View;
@@ -162,14 +163,26 @@ class MediaController extends Controller
         return redirect()->route('library')->with('success', 'Media and its files were deleted.');
     }
 
-    public function stream(Media $medium): BinaryFileResponse
+    public function stream(Media $medium): BinaryFileResponse|HttpResponse
     {
         $file = $medium->files()->firstOrFail();
         $root = realpath(config('auroraarchive.media_root'));
         $path = realpath(rtrim(config('auroraarchive.media_root'), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$file->path);
         abort_if($root === false || $path === false || ! str_starts_with($path, $root.DIRECTORY_SEPARATOR), 404);
 
-        return Response::file($path, ['Content-Type' => $file->mime_type ?: 'video/mp4', 'Accept-Ranges' => 'bytes']);
+        $headers = [
+            'Content-Type' => $file->mime_type ?: 'video/mp4',
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'private, max-age=3600',
+        ];
+        if (config('auroraarchive.accelerated_streaming')) {
+            $relativePath = str_replace('\\', '/', $file->path);
+            $headers['X-Accel-Redirect'] = '/protected-media/'.implode('/', array_map('rawurlencode', explode('/', $relativePath)));
+
+            return response('', 200, $headers);
+        }
+
+        return Response::file($path, $headers)->setAutoEtag()->setAutoLastModified();
     }
 
     public function thumbnail(Media $medium, MediaThumbnail $thumbnail): BinaryFileResponse|RedirectResponse

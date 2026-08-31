@@ -52,6 +52,7 @@ ENV APP_NAME=AuroraArchive \
     CACHE_STORE=database \
     SESSION_DRIVER=database \
     MEDIA_ROOT=/media \
+    MEDIA_ACCELERATED_STREAMING=true \
     AURORAARCHIVE_CONFIG_ROOT=/config \
     YT_DLP_BINARY=/var/www/html/storage/app/bin/yt-dlp \
     AURORAARCHIVE_TEMP_ROOT=/var/www/html/storage/app/tmp \
