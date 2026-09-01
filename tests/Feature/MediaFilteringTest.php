@@ -40,14 +40,21 @@ test('the library can find archived videos reported unavailable by youtube', fun
     $user = User::factory()->create();
     $archived = filterableMedium('AAAAAAAAAAA', 'Preserved removed video', MediaStatus::Downloaded, true);
     $archived->update(['metadata' => ['youtube' => ['unavailable' => true]]]);
-    $available = filterableMedium('BBBBBBBBBBB', 'Available archived video', MediaStatus::Downloaded, true);
-    $placeholder = filterableMedium('CCCCCCCCCCC', 'Unavailable without archive', MediaStatus::Failed, false);
+    $legacy = filterableMedium('BBBBBBBBBBB', 'Legacy removed video', MediaStatus::Downloaded, true);
+    $legacy->update(['metadata' => ['availability' => 'private']]);
+    $tubeSync = filterableMedium('CCCCCCCCCCC', 'TubeSync removed video', MediaStatus::Downloaded, true);
+    $tubeSync->update(['metadata' => ['tubesync' => ['sources' => ['source-1' => ['metadata' => ['availability' => 'unavailable']]]]]]);
+    $available = filterableMedium('DDDDDDDDDDD', 'Available archived video', MediaStatus::Downloaded, true);
+    $available->update(['metadata' => ['availability' => 'private', 'youtube' => ['availability_check_status' => 'available', 'unavailable' => false]]]);
+    $placeholder = filterableMedium('EEEEEEEEEEE', 'Unavailable without archive', MediaStatus::Failed, false);
     $placeholder->update(['metadata' => ['youtube' => ['unavailable' => true]]]);
 
     $this->actingAs($user)
         ->get(route('library', ['filter' => 'youtube_unavailable']))
         ->assertOk()
         ->assertSee('Preserved removed video')
+        ->assertSee('Legacy removed video')
+        ->assertSee('TubeSync removed video')
         ->assertSee('Removed from YouTube')
         ->assertDontSee('Available archived video')
         ->assertDontSee('Unavailable without archive');

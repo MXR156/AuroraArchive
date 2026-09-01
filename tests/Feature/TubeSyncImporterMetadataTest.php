@@ -85,6 +85,7 @@ test('it imports saved media metadata in preference to sparse playlist metadata'
                 'description' => 'Saved TubeSync description',
                 'channel' => 'Saved channel name',
                 'channel_id' => 'UCsaved',
+                'availability' => 'unavailable',
                 'webpage_url' => 'https://www.youtube.com/watch?v=video123',
             ], JSON_THROW_ON_ERROR),
         ],
@@ -99,5 +100,6 @@ test('it imports saved media metadata in preference to sparse playlist metadata'
         ->description->toBe('Saved TubeSync description')
         ->channel_name->toBe('Saved channel name')
         ->channel_id->toBe('UCsaved')
+        ->and($medium->isUnavailableOnYoutube())->toBeTrue()
         ->and(data_get($medium->metadata, "tubesync.sources.{$sourceUuid}.metadata.playlist_index"))->toBe(7);
 });

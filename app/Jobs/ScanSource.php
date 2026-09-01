@@ -57,8 +57,13 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
             if ($isUnavailable) {
                 Arr::set($metadata, 'youtube.unavailable', true);
                 Arr::set($metadata, 'youtube.unavailable_at', now()->toIso8601String());
+                Arr::set($metadata, 'youtube.availability_check_status', 'unavailable');
+                Arr::set($metadata, 'youtube.availability_checked_at', now()->toIso8601String());
             } else {
-                Arr::forget($metadata, ['youtube.unavailable', 'youtube.unavailable_at']);
+                Arr::set($metadata, 'youtube.unavailable', false);
+                Arr::set($metadata, 'youtube.availability_check_status', 'available');
+                Arr::set($metadata, 'youtube.availability_checked_at', now()->toIso8601String());
+                Arr::forget($metadata, 'youtube.unavailable_at');
             }
 
             $preserveArchivedMetadata = $isUnavailable && ! $isNew && $medium->status === MediaStatus::Downloaded;

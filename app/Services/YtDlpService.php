@@ -64,6 +64,35 @@ class YtDlpService implements YoutubeDownloader
         return $result;
     }
 
+    public function checkAvailability(Media $media): array
+    {
+        $result = $this->run(
+            ['--simulate', '--no-playlist', '--dump-single-json', $media->youtubeVideoUrl()],
+            $this->cookiesFor($media->source?->user_id),
+            90,
+        );
+        if ($result['exit_code'] === 0) {
+            return ['status' => 'available', 'reason' => null];
+        }
+
+        $error = Str::lower($result['stderr']);
+        if (Str::contains($error, [
+            'private video',
+            'video unavailable',
+            'has been removed',
+            'is no longer available',
+            'account associated with this video has been terminated',
+            'copyright claim',
+        ])) {
+            return [
+                'status' => 'unavailable',
+                'reason' => Str::limit(trim(Str::afterLast($result['stderr'], 'ERROR:')), 500, ''),
+            ];
+        }
+
+        return ['status' => 'unknown', 'reason' => Str::limit(trim($result['stderr']), 500, '')];
+    }
+
     /** @param array{exit_code:int,stdout:string,stderr:string} $result */
     private function requiresUnauthenticatedRetry(array $result): bool
     {

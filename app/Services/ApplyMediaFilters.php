@@ -23,7 +23,23 @@ class ApplyMediaFilters
             'downloaded' => $query->whereHas('files'),
             'youtube_unavailable' => $query
                 ->whereHas('files')
-                ->where('metadata->youtube->unavailable', true),
+                ->where(fn ($availability) => $availability
+                    ->where(fn ($checked) => $checked
+                        ->where('metadata->youtube->unavailable', true)
+                        ->where(fn ($status) => $status
+                            ->whereNull('metadata->youtube->availability_check_status')
+                            ->orWhere('metadata->youtube->availability_check_status', '!=', 'available')))
+                    ->orWhere(fn ($legacy) => $legacy
+                        ->where(fn ($check) => $check
+                            ->whereNull('metadata->youtube->availability_check_status')
+                            ->orWhere('metadata->youtube->availability_check_status', 'unknown'))
+                        ->where(fn ($state) => $state
+                            ->whereIn('metadata->availability', ['private', 'unavailable', 'needs_auth', 'subscriber_only', 'premium_only'])
+                            ->orWhere('metadata', 'like', '%"availability"%"private"%')
+                            ->orWhere('metadata', 'like', '%"availability"%"unavailable"%')
+                            ->orWhere('metadata', 'like', '%"availability"%"needs_auth"%')
+                            ->orWhere('metadata', 'like', '%"availability"%"subscriber_only"%')
+                            ->orWhere('metadata', 'like', '%"availability"%"premium_only"%')))),
             'not_downloaded' => $query->whereDoesntHave('files'),
             'watched' => $query->whereHas('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),
             'unwatched' => $query->whereDoesntHave('watchHistory', fn ($history) => $history->whereBelongsTo($request->user())->where('watched', true)),

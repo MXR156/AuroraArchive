@@ -61,7 +61,20 @@ class Media extends Model
 
     public function isUnavailableOnYoutube(): bool
     {
-        return (bool) Arr::get($this->metadata, 'youtube.unavailable', false);
+        $checkStatus = Arr::get($this->metadata, 'youtube.availability_check_status');
+        if (in_array($checkStatus, ['available', 'unavailable'], true)) {
+            return $checkStatus === 'unavailable';
+        }
+
+        if ((bool) Arr::get($this->metadata, 'youtube.unavailable', false)) {
+            return true;
+        }
+
+        $unavailableStates = ['private', 'unavailable', 'needs_auth', 'subscriber_only', 'premium_only'];
+
+        return collect(Arr::dot($this->metadata ?? []))
+            ->filter(fn (mixed $value, string $key): bool => $key === 'availability' || Str::endsWith($key, '.availability'))
+            ->contains(fn (mixed $value): bool => is_string($value) && in_array(Str::lower($value), $unavailableStates, true));
     }
 
     public function archiveChannelKey(): string

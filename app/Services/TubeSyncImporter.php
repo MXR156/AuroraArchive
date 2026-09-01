@@ -165,6 +165,10 @@ class TubeSyncImporter
             'thumbnail_path' => $this->relativePath($row->thumb),
             'metadata' => $metadata,
         ]);
+        if ($this->isUnavailable($metadata)) {
+            Arr::set($storedMetadata, 'youtube.unavailable', true);
+            Arr::set($storedMetadata, 'youtube.unavailable_at', now()->toIso8601String());
+        }
         $title = Arr::get($storedMetadata, 'manual.title')
             ? $medium->title
             : (string) (Arr::get($metadata, 'title') ?: $row->title ?: $row->key);
@@ -294,6 +298,18 @@ class TubeSyncImporter
     private function shouldQueue(object $medium): bool
     {
         return $this->mediaPath($medium) === null && (bool) $medium->can_download && ! (bool) $medium->skip && ! (bool) $medium->manual_skip;
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private function isUnavailable(array $metadata): bool
+    {
+        return in_array(Str::lower((string) Arr::get($metadata, 'availability')), [
+            'private',
+            'unavailable',
+            'needs_auth',
+            'subscriber_only',
+            'premium_only',
+        ], true);
     }
 
     private function mediaPath(object $medium): ?string

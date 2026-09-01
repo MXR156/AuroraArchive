@@ -13,6 +13,9 @@ interface YoutubeDownloader
     /** @return array{exit_code:int,stdout:string,stderr:string,files:list<string>,version:?string} */
     public function download(Media $media): array;
 
+    /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
+    public function checkAvailability(Media $media): array;
+
     /** @return array{status:string,message:string} */
     public function testAuthentication(string $cookies): array;
 

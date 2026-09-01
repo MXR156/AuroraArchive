@@ -1,8 +1,14 @@
 <x-layouts.app title="Library">
     <div class="grid gap-7">
-        <header>
-            <p class="text-sm text-zinc-500">{{ $media->total() }} items</p>
-            <h1 class="text-3xl font-bold">Library</h1>
+        <header class="flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-sm text-zinc-500">{{ $media->total() }} items</p>
+                <h1 class="text-3xl font-bold">Library</h1>
+            </div>
+            <form method="POST" action="{{ route('library.check-availability') }}">
+                @csrf
+                <button class="secondary">Check YouTube availability</button>
+            </form>
         </header>
 
         <x-media-filters :clear-url="route('library')" />
