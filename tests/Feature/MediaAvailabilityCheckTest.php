@@ -58,6 +58,21 @@ test('a successful youtube response clears a stale unavailable flag', function (
         ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('available');
 });
 
+test('an inconclusive recheck no longer presents an old audit result as confirmed', function () {
+    $medium = availabilityMedium('AAAAAAAAAAA');
+    $medium->update(['metadata' => ['youtube' => ['availability_check_status' => 'unavailable', 'unavailable' => true]]]);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('checkAvailability')->once()->andReturn([
+        'status' => 'unknown',
+        'reason' => 'Video unavailable',
+    ]);
+
+    (new CheckMediaAvailability($medium))->handle($youtube);
+
+    expect($medium->refresh()->isUnavailableOnYoutube())->toBeFalse()
+        ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('unknown');
+});
+
 test('the audit queues checks only for media with archived files', function () {
     Queue::fake();
     $archived = availabilityMedium('AAAAAAAAAAA');

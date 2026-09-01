@@ -28,7 +28,7 @@ class ApplyMediaFilters
                         ->where('metadata->youtube->unavailable', true)
                         ->where(fn ($status) => $status
                             ->whereNull('metadata->youtube->availability_check_status')
-                            ->orWhere('metadata->youtube->availability_check_status', '!=', 'available')))
+                            ->orWhere('metadata->youtube->availability_check_status', 'unavailable')))
                     ->orWhere(fn ($legacy) => $legacy
                         ->where(fn ($check) => $check
                             ->whereNull('metadata->youtube->availability_check_status')

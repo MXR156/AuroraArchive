@@ -66,7 +66,7 @@ class Media extends Model
             return $checkStatus === 'unavailable';
         }
 
-        if ((bool) Arr::get($this->metadata, 'youtube.unavailable', false)) {
+        if ($checkStatus === null && (bool) Arr::get($this->metadata, 'youtube.unavailable', false)) {
             return true;
         }
 

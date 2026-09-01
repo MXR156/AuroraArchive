@@ -66,23 +66,42 @@ class YtDlpService implements YoutubeDownloader
 
     public function checkAvailability(Media $media): array
     {
-        $result = $this->run(
-            ['--simulate', '--no-playlist', '--dump-single-json', $media->youtubeVideoUrl()],
-            $this->cookiesFor($media->source?->user_id),
-            90,
-        );
+        $arguments = ['--simulate', '--no-playlist', '--dump-single-json', $media->youtubeVideoUrl()];
+        $cookies = $this->cookiesFor($media->source?->user_id);
+        $result = $this->run($arguments, $cookies, 90);
+        if (filled($cookies) && $this->requiresUnauthenticatedRetry($result)) {
+            $retry = $this->run($arguments, null, 90);
+            if ($retry['exit_code'] === 0) {
+                $result = $retry;
+            }
+        }
+
+        return $this->availabilityResult($result);
+    }
+
+    /** @param array{exit_code:int,stdout:string,stderr:string} $result @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
+    private function availabilityResult(array $result): array
+    {
         if ($result['exit_code'] === 0) {
             return ['status' => 'available', 'reason' => null];
         }
 
         $error = Str::lower($result['stderr']);
         if (Str::contains($error, [
+            'playback on other websites has been disabled',
+            'embedding disabled',
+        ])) {
+            return ['status' => 'available', 'reason' => null];
+        }
+
+        if (Str::contains($error, [
             'private video',
-            'video unavailable',
-            'has been removed',
+            'this video has been removed',
+            'video has been removed',
+            'removed by the uploader',
+            'removed for violating',
             'is no longer available',
             'account associated with this video has been terminated',
-            'copyright claim',
         ])) {
             return [
                 'status' => 'unavailable',

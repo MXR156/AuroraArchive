@@ -50,3 +50,18 @@ it('only retries playback restrictions without authentication', function (string
     ['This video is private', false],
     ['Sign in to confirm your age', false],
 ]);
+
+it('classifies youtube availability conservatively', function (string $error, string $expectedStatus) {
+    $method = new ReflectionMethod(YtDlpService::class, 'availabilityResult');
+    $result = ['exit_code' => 1, 'stdout' => '', 'stderr' => $error];
+
+    expect($method->invoke(app(YtDlpService::class), $result)['status'])->toBe($expectedStatus);
+})->with([
+    ['ERROR: Private video', 'unavailable'],
+    ['ERROR: This video has been removed by the uploader', 'unavailable'],
+    ['ERROR: Video unavailable. The account associated with this video has been terminated', 'unavailable'],
+    ['ERROR: Video unavailable. Playback on other websites has been disabled by the video owner', 'available'],
+    ['ERROR: Video unavailable', 'unknown'],
+    ['ERROR: Sign in to confirm your age', 'unknown'],
+    ['ERROR: HTTP Error 429: Too Many Requests', 'unknown'],
+]);
