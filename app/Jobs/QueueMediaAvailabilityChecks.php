@@ -25,7 +25,10 @@ class QueueMediaAvailabilityChecks implements ShouldBeUnique, ShouldQueue
         Media::query()
             ->whereHas('files')
             ->select('id')
-            ->chunkById(250, fn ($media) => $media->each(fn (Media $medium) => CheckMediaAvailability::dispatch($medium)));
+            ->chunkById(250, fn ($media) => $media->each(function (Media $medium): void {
+                CheckMediaAvailability::dispatch($medium);
+                GenerateMediaThumbnail::dispatch($medium);
+            }));
     }
 
     public function failed(?Throwable $exception): void

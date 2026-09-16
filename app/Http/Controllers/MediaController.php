@@ -8,6 +8,7 @@ use App\Http\Requests\BulkRetryMediaRequest;
 use App\Http\Requests\UpdateMediaRequest;
 use App\Jobs\DownloadMedia;
 use App\Jobs\GenerateMediaThumbnail;
+use App\Jobs\RefreshMediaThumbnail;
 use App\Models\Media;
 use App\Models\Playlist;
 use App\Models\WatchHistory;
@@ -64,6 +65,13 @@ class MediaController extends Controller
         }
 
         return back()->with('success', 'Download queued.');
+    }
+
+    public function refreshThumbnail(Media $medium): RedirectResponse
+    {
+        RefreshMediaThumbnail::dispatch($medium);
+
+        return back()->with('success', 'YouTube thumbnail check queued. Refresh this page shortly to see the result.');
     }
 
     public function bulkRetry(BulkRetryMediaRequest $request): RedirectResponse

@@ -62,7 +62,7 @@ it('classifies youtube availability conservatively', function (string $error, st
     ['ERROR: This video has been removed by the uploader', 'unavailable'],
     ['ERROR: Video unavailable. The account associated with this video has been terminated', 'unavailable'],
     ['ERROR: Video unavailable. Playback on other websites has been disabled by the video owner', 'available'],
-    ['ERROR: Video unavailable', 'unknown'],
+    ['ERROR: Video unavailable', 'unavailable'],
     ['ERROR: Sign in to confirm your age', 'unknown'],
     ['ERROR: HTTP Error 429: Too Many Requests', 'unknown'],
 ]);

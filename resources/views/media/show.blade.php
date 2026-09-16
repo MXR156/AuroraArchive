@@ -6,7 +6,7 @@
             @endif
             <div class="aspect-video overflow-hidden rounded-2xl bg-black">
                 @if($medium->files->isNotEmpty())
-                    <video class="media-player size-full" controls @if($playlistName) autoplay @endif preload="metadata"
+                    <video class="media-player size-full" controls @if($playlistName) autoplay @endif preload="metadata" poster="{{ route('media.thumbnail', $medium) }}"
                         data-progress-url="{{ route('media.progress', $medium) }}"
                         data-resume="{{ $medium->watchHistory->first()?->position_seconds ?? 0 }}"
                         @if($nextUrl) data-next-url="{{ $nextUrl }}" @endif>
@@ -52,6 +52,10 @@
                         <a href="{{ route('playlists.index') }}" class="secondary grid size-10 place-items-center px-0 text-lg" title="Create a playlist" aria-label="Create a playlist">+</a>
                     @endif
                     <a href="{{ route('media.edit', $medium) }}" class="secondary">Edit metadata</a>
+                    <form method="POST" action="{{ route('media.thumbnail.refresh', $medium) }}">
+                        @csrf
+                        <button class="secondary">Check thumbnail</button>
+                    </form>
                     @if($next)
                         <a href="{{ $nextUrl }}" class="secondary">Next video</a>
                     @endif

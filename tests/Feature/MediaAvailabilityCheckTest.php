@@ -3,6 +3,7 @@
 use App\Contracts\YoutubeDownloader;
 use App\Enums\MediaStatus;
 use App\Jobs\CheckMediaAvailability;
+use App\Jobs\GenerateMediaThumbnail;
 use App\Jobs\QueueMediaAvailabilityChecks;
 use App\Models\Media;
 use App\Models\MediaFile;
@@ -82,6 +83,7 @@ test('the audit queues checks only for media with archived files', function () {
 
     Queue::assertPushed(CheckMediaAvailability::class, 1);
     Queue::assertPushed(CheckMediaAvailability::class, fn (CheckMediaAvailability $job): bool => $job->media->is($archived) && $job->queue === 'maintenance');
+    Queue::assertPushed(GenerateMediaThumbnail::class, 1);
 });
 
 test('an authenticated user can queue an availability audit', function () {

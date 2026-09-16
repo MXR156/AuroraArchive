@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     Route::put('/media/{medium}', [MediaController::class, 'update'])->name('media.update');
     Route::get('/media/{medium}/stream', [MediaController::class, 'stream'])->name('media.stream');
     Route::get('/media/{medium}/thumbnail', [MediaController::class, 'thumbnail'])->name('media.thumbnail');
+    Route::post('/media/{medium}/thumbnail/refresh', [MediaController::class, 'refreshThumbnail'])->name('media.thumbnail.refresh');
     Route::post('/media/{medium}/download', [MediaController::class, 'queue'])->name('media.queue');
     Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->name('media.destroy');
     Route::put('/media/{medium}/progress', [MediaController::class, 'progress'])->name('media.progress');

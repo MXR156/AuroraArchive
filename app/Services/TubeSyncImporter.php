@@ -102,7 +102,7 @@ class TubeSyncImporter
                     $this->attachMediaFile($medium, $mediaPath, $this->pathRelativeToMediaRoot($mediaPath), $row);
                     $medium->update([
                         'status' => MediaStatus::Downloaded,
-                        'channel_name' => $medium->channel_name ?: basename(dirname($mediaPath)),
+                        'channel_name' => $medium->channel_name ?: $this->channelNameFromMediaPath($source, $mediaPath),
                         'thumbnail_url' => route('media.thumbnail', $medium, absolute: false),
                     ]);
                     $summary['files']++;
@@ -181,11 +181,15 @@ class TubeSyncImporter
             : ($hasArchivedFile
                 ? ($medium->description ?: Arr::get($metadata, 'description'))
                 : (Arr::get($metadata, 'description') ?: $medium->description));
+        $incomingChannelName = Arr::get($metadata, 'channel')
+            ?: Arr::get($metadata, 'uploader')
+            ?: Arr::get($metadata, 'channel_name')
+            ?: Arr::get($metadata, 'uploader_name');
         $channelName = Arr::get($storedMetadata, 'manual.channel_name')
             ? $medium->channel_name
             : ($hasArchivedFile
-                ? ($medium->channel_name ?: Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader'))
-                : (Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader') ?: $medium->channel_name));
+                ? $this->preservedChannelName($source, $medium->channel_name, $incomingChannelName)
+                : ($incomingChannelName ?: $medium->channel_name));
 
         $medium->fill([
             'title' => $title,
@@ -335,6 +339,28 @@ class TubeSyncImporter
             && filled($title)
             && $title !== $youtubeId
             && ! Str::contains(Str::lower($title), ['[deleted video]', '[private video]', '[unavailable video]']);
+    }
+
+    private function preservedChannelName(Source $source, ?string $current, mixed $incoming): ?string
+    {
+        if (filled($current) && ! $this->isPlaylistName($source, $current)) {
+            return $current;
+        }
+
+        return filled($incoming) ? (string) $incoming : $current;
+    }
+
+    private function channelNameFromMediaPath(Source $source, string $mediaPath): ?string
+    {
+        $folderName = basename(dirname($mediaPath));
+
+        return filled($folderName) && ! $this->isPlaylistName($source, $folderName) ? $folderName : null;
+    }
+
+    private function isPlaylistName(Source $source, string $channelName): bool
+    {
+        return $source->type === 'playlist'
+            && Str::slug($channelName) === Str::slug($source->name);
     }
 
     private function mediaPath(object $medium): ?string

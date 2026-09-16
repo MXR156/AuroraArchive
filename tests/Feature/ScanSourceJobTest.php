@@ -152,6 +152,33 @@ it('does not rewrite catalogue metadata after a file has been archived', functio
         ->and($medium->channel_name)->toBe('Original archived channel');
 });
 
+it('repairs a playlist name stored as the channel when youtube provides the creator', function () {
+    Queue::fake();
+    $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Archive Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+    $medium = Media::query()->create([
+        'source_id' => $source->id,
+        'youtube_id' => 'archived123',
+        'title' => 'Archived title',
+        'channel_name' => 'Archive Playlist',
+        'original_url' => 'https://www.youtube.com/watch?v=archived123',
+        'status' => MediaStatus::Downloaded,
+    ]);
+    MediaFile::query()->create(['media_id' => $medium->id, 'path' => 'Archive Playlist/archived123.mp4']);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('discover')->once()->andReturn([[
+        'id' => 'archived123',
+        'title' => 'Changed YouTube title',
+        'channel' => 'Actual Creator',
+        'availability' => 'public',
+    ]]);
+
+    (new ScanSource($source))->handle($youtube);
+
+    $medium->refresh();
+    expect($medium->title)->toBe('Archived title')
+        ->and($medium->channel_name)->toBe('Actual Creator');
+});
+
 it('ignores deliberately deleted media IDs during later scans', function () {
     Queue::fake();
     $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);

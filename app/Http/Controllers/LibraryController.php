@@ -23,6 +23,6 @@ class LibraryController extends Controller
     {
         QueueMediaAvailabilityChecks::dispatch();
 
-        return back()->with('success', 'YouTube availability audit queued. Results will appear progressively as videos are checked.');
+        return back()->with('success', 'YouTube availability and thumbnail audit queued. Results will appear progressively as videos are checked.');
     }
 }

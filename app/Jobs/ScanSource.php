@@ -71,7 +71,7 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
                 'source_id' => $isNew ? $this->source->id : $medium->source_id,
                 'title' => Arr::get($metadata, 'manual.title') ? $medium->title : ($hasArchivedFile ? $this->preservedTitle($medium->title, Arr::get($entry, 'title'), $youtubeId) : (filled(Arr::get($entry, 'title')) ? (string) Arr::get($entry, 'title') : ($medium->title ?: $youtubeId))),
                 'description' => Arr::get($metadata, 'manual.description') ? $medium->description : ($hasArchivedFile ? ($medium->description ?: Arr::get($entry, 'description')) : (Arr::get($entry, 'description') ?: $medium->description)),
-                'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $medium->channel_name : ($hasArchivedFile ? ($medium->channel_name ?: Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader')) : (Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader') ?: $medium->channel_name)),
+                'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $medium->channel_name : ($hasArchivedFile ? $this->preservedChannelName($medium->channel_name, Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader')) : (Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader') ?: $medium->channel_name)),
                 'channel_id' => $medium->channel_id ?: Arr::get($entry, 'channel_id'),
                 'published_at' => $medium->published_at ?: (filled(Arr::get($entry, 'timestamp')) ? now()->setTimestamp((int) Arr::get($entry, 'timestamp')) : null),
                 'duration_seconds' => $medium->duration_seconds ?: Arr::get($entry, 'duration'),
@@ -116,6 +116,21 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
             && filled($title)
             && $title !== $youtubeId
             && ! Str::contains(Str::lower($title), ['[deleted video]', '[private video]', '[unavailable video]']);
+    }
+
+    private function preservedChannelName(?string $current, mixed $incoming): ?string
+    {
+        if (filled($current) && ! $this->isPlaylistName($current)) {
+            return $current;
+        }
+
+        return filled($incoming) ? (string) $incoming : $current;
+    }
+
+    private function isPlaylistName(string $channelName): bool
+    {
+        return $this->source->type === 'playlist'
+            && Str::slug($channelName) === Str::slug($this->source->name);
     }
 
     public function failed(?Throwable $exception): void

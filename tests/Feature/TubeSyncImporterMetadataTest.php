@@ -105,7 +105,7 @@ test('it imports saved media metadata in preference to sparse playlist metadata'
         ->and(data_get($medium->metadata, "tubesync.sources.{$sourceUuid}.metadata.playlist_index"))->toBe(7);
 
     MediaFile::query()->create(['media_id' => $medium->id, 'path' => 'Saved channel name/video123.mp4']);
-    $medium->update(['title' => 'video123', 'description' => null, 'channel_name' => null]);
+    $medium->update(['title' => 'video123', 'description' => null, 'channel_name' => 'Archived playlist']);
 
     app(TubeSyncImporter::class)->import(User::factory()->create(), [$sourceUuid], false);
 

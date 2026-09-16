@@ -113,6 +113,7 @@ class YtDlpService implements YoutubeDownloader
             'removed for violating',
             'is no longer available',
             'account associated with this video has been terminated',
+            'video unavailable',
         ])) {
             return [
                 'status' => 'unavailable',

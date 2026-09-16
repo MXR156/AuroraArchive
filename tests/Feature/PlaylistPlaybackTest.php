@@ -51,6 +51,7 @@ test('playlist playback exposes the next item and preserves playlist context', f
     $playlist = playlistFor($user, 'Evening playlist');
     $first = playlistMedium('AAAAAAAAAAA', 'First video');
     $second = playlistMedium('BBBBBBBBBBB', 'Second video');
+    $first->files()->create(['path' => 'Example channel/AAAAAAAAAAA.mp4']);
     $playlist->playlistMedia()->attach([$first->id => ['position' => 1], $second->id => ['position' => 2]]);
 
     $this->actingAs($user)
@@ -63,6 +64,7 @@ test('playlist playback exposes the next item and preserves playlist context', f
         ->assertSee('Archive Channel')
         ->assertSee('Original Video')
         ->assertSee('Original Channel')
+        ->assertSee('poster="'.route('media.thumbnail', $first).'"', escape: false)
         ->assertSee(route('media.show', ['medium' => $second, 'playlist' => $playlist]), escape: false);
 });
 
