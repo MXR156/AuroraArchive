@@ -52,12 +52,37 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
         }
         $thumbnail = collect($result['files'])->first(fn (string $path): bool => is_file($path) && Str::endsWith(Str::lower($path), ['.jpg', '.jpeg', '.png', '.webp', '.avif']));
         $metadata = $this->media->metadata ?? [];
+        $downloadMetadata = is_array(Arr::get($result, 'metadata')) ? Arr::get($result, 'metadata') : [];
+        if ($downloadMetadata !== []) {
+            Arr::set($metadata, 'youtube.archive_snapshot', Arr::only($downloadMetadata, [
+                'title',
+                'description',
+                'channel',
+                'channel_id',
+                'channel_url',
+                'uploader',
+                'uploader_id',
+                'uploader_url',
+                'timestamp',
+                'upload_date',
+                'duration',
+                'thumbnail',
+                'availability',
+            ]));
+            Arr::set($metadata, 'youtube.archived_at', now()->toIso8601String());
+        }
         if ($thumbnail !== null) {
             Arr::set($metadata, 'local_thumbnail_path', Str::after(str_replace('\\', '/', $thumbnail), rtrim(str_replace('\\', '/', config('auroraarchive.media_root')), '/').'/'));
         }
         $this->media->update([
+            'title' => Arr::get($metadata, 'manual.title') || blank(Arr::get($downloadMetadata, 'title')) ? $this->media->title : (string) Arr::get($downloadMetadata, 'title'),
+            'description' => Arr::get($metadata, 'manual.description') || blank(Arr::get($downloadMetadata, 'description')) ? $this->media->description : (string) Arr::get($downloadMetadata, 'description'),
+            'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $this->media->channel_name : (Arr::get($downloadMetadata, 'channel') ?: Arr::get($downloadMetadata, 'uploader') ?: $this->media->channel_name),
+            'channel_id' => Arr::get($downloadMetadata, 'channel_id') ?: Arr::get($downloadMetadata, 'uploader_id') ?: $this->media->channel_id,
+            'published_at' => filled(Arr::get($downloadMetadata, 'timestamp')) ? now()->setTimestamp((int) Arr::get($downloadMetadata, 'timestamp')) : $this->media->published_at,
+            'duration_seconds' => Arr::get($downloadMetadata, 'duration') ?: $this->media->duration_seconds,
             'status' => MediaStatus::Downloaded,
-            'thumbnail_url' => $thumbnail === null ? $this->media->thumbnail_url : route('media.thumbnail', $this->media, absolute: false),
+            'thumbnail_url' => $thumbnail === null ? (Arr::get($downloadMetadata, 'thumbnail') ?: $this->media->getRawOriginal('thumbnail_url')) : route('media.thumbnail', $this->media, absolute: false),
             'metadata' => $metadata,
         ]);
     }

@@ -154,6 +154,7 @@ class TubeSyncImporter
     private function importMedium(Source $source, object $row, array $metadata): Media
     {
         $medium = Media::query()->firstOrNew(['youtube_id' => (string) $row->key]);
+        $hasArchivedFile = $medium->exists && ($medium->status === MediaStatus::Downloaded || $medium->files()->exists());
         if (! $medium->exists) {
             $medium->source_id = $source->id;
         }
@@ -169,25 +170,32 @@ class TubeSyncImporter
             Arr::set($storedMetadata, 'youtube.unavailable', true);
             Arr::set($storedMetadata, 'youtube.unavailable_at', now()->toIso8601String());
         }
+        $incomingTitle = Arr::get($metadata, 'title') ?: $row->title;
         $title = Arr::get($storedMetadata, 'manual.title')
             ? $medium->title
-            : (string) (Arr::get($metadata, 'title') ?: $row->title ?: $row->key);
+            : ($hasArchivedFile
+                ? $this->preservedTitle($medium->title, $incomingTitle, (string) $row->key)
+                : (string) (Arr::get($metadata, 'title') ?: $row->title ?: $medium->title ?: $row->key));
         $description = Arr::get($storedMetadata, 'manual.description')
             ? $medium->description
-            : Arr::get($metadata, 'description');
+            : ($hasArchivedFile
+                ? ($medium->description ?: Arr::get($metadata, 'description'))
+                : (Arr::get($metadata, 'description') ?: $medium->description));
         $channelName = Arr::get($storedMetadata, 'manual.channel_name')
             ? $medium->channel_name
-            : (Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader'));
+            : ($hasArchivedFile
+                ? ($medium->channel_name ?: Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader'))
+                : (Arr::get($metadata, 'channel') ?: Arr::get($metadata, 'uploader') ?: $medium->channel_name));
 
         $medium->fill([
             'title' => $title,
             'description' => $description,
             'channel_name' => $channelName,
-            'channel_id' => Arr::get($metadata, 'channel_id') ?: Arr::get($metadata, 'uploader_id'),
-            'published_at' => $this->publishedAt($row->published, $metadata),
-            'duration_seconds' => $row->duration ?: Arr::get($metadata, 'duration'),
-            'thumbnail_url' => Arr::get($metadata, 'thumbnail') ?: Arr::get($metadata, 'thumbnails.0.url'),
-            'original_url' => Arr::get($metadata, 'webpage_url') ?: 'https://www.youtube.com/watch?v='.$row->key,
+            'channel_id' => $hasArchivedFile ? $medium->channel_id : (Arr::get($metadata, 'channel_id') ?: Arr::get($metadata, 'uploader_id') ?: $medium->channel_id),
+            'published_at' => $hasArchivedFile ? $medium->published_at : ($this->publishedAt($row->published, $metadata) ?: $medium->published_at),
+            'duration_seconds' => $hasArchivedFile ? $medium->duration_seconds : ($row->duration ?: Arr::get($metadata, 'duration') ?: $medium->duration_seconds),
+            'thumbnail_url' => $hasArchivedFile ? $medium->getRawOriginal('thumbnail_url') : (Arr::get($metadata, 'thumbnail') ?: Arr::get($metadata, 'thumbnails.0.url') ?: $medium->getRawOriginal('thumbnail_url')),
+            'original_url' => 'https://www.youtube.com/watch?v='.$row->key,
             'metadata' => $storedMetadata,
         ])->save();
 
@@ -310,6 +318,23 @@ class TubeSyncImporter
             'subscriber_only',
             'premium_only',
         ], true);
+    }
+
+    private function preservedTitle(?string $current, mixed $incoming, string $youtubeId): string
+    {
+        if ($this->isUsefulTitle($current, $youtubeId)) {
+            return $current;
+        }
+
+        return $this->isUsefulTitle($incoming, $youtubeId) ? (string) $incoming : ($current ?: $youtubeId);
+    }
+
+    private function isUsefulTitle(mixed $title, string $youtubeId): bool
+    {
+        return is_string($title)
+            && filled($title)
+            && $title !== $youtubeId
+            && ! Str::contains(Str::lower($title), ['[deleted video]', '[private video]', '[unavailable video]']);
     }
 
     private function mediaPath(object $medium): ?string

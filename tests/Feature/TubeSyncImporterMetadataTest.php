@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Media;
+use App\Models\MediaFile;
 use App\Models\User;
 use App\Services\TubeSyncImporter;
 use Illuminate\Database\Schema\Blueprint;
@@ -102,4 +103,27 @@ test('it imports saved media metadata in preference to sparse playlist metadata'
         ->channel_id->toBe('UCsaved')
         ->and($medium->isUnavailableOnYoutube())->toBeTrue()
         ->and(data_get($medium->metadata, "tubesync.sources.{$sourceUuid}.metadata.playlist_index"))->toBe(7);
+
+    MediaFile::query()->create(['media_id' => $medium->id, 'path' => 'Saved channel name/video123.mp4']);
+    $medium->update(['title' => 'video123', 'description' => null, 'channel_name' => null]);
+
+    app(TubeSyncImporter::class)->import(User::factory()->create(), [$sourceUuid], false);
+
+    $medium->refresh();
+    expect($medium->title)->toBe('Saved TubeSync title')
+        ->and($medium->description)->toBe('Saved TubeSync description')
+        ->and($medium->channel_name)->toBe('Saved channel name');
+
+    DB::connection('tubesync')->table('sync_media')->where('uuid', $mediaUuid)->update(['title' => '[Private video]']);
+    DB::connection('tubesync')->table('sync_media_metadata')->where('media_id', $mediaUuid)->update([
+        'value' => json_encode(['id' => 'video123', 'title' => '[Private video]', 'availability' => 'private'], JSON_THROW_ON_ERROR),
+    ]);
+
+    app(TubeSyncImporter::class)->import(User::factory()->create(), [$sourceUuid], false);
+
+    $medium->refresh();
+    expect($medium->title)->toBe('Saved TubeSync title')
+        ->and($medium->description)->toBe('Saved TubeSync description')
+        ->and($medium->channel_name)->toBe('Saved channel name')
+        ->and($medium->channel_id)->toBe('UCsaved');
 });

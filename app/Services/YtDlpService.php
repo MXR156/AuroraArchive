@@ -8,6 +8,7 @@ use App\Models\Source;
 use App\Models\YoutubeCredential;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -40,6 +41,8 @@ class YtDlpService implements YoutubeDownloader
             '--format',
             'bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/best[vcodec^=avc1][ext=mp4]/bestvideo+bestaudio/best',
             '--embed-thumbnail',
+            '--embed-metadata',
+            '--write-info-json',
             '--merge-output-format',
             'mp4',
             '--postprocessor-args',
@@ -58,7 +61,15 @@ class YtDlpService implements YoutubeDownloader
                 $result['stderr'] .= PHP_EOL.'Unauthenticated retry:'.PHP_EOL.$retry['stderr'];
             }
         }
-        $result['files'] = array_values(array_filter(glob($directory.'/*') ?: [], fn (string $path): bool => Str::contains(basename($path), '['.$media->youtube_id.']')));
+        $files = array_values(array_filter(glob($directory.'/*') ?: [], fn (string $path): bool => Str::contains(basename($path), '['.$media->youtube_id.']')));
+        $infoPath = collect($files)->first(fn (string $path): bool => Str::endsWith(Str::lower($path), '.info.json'));
+        $downloadMetadata = $infoPath !== null ? json_decode((string) file_get_contents($infoPath), true) : null;
+        if ($infoPath !== null) {
+            unlink($infoPath);
+            $files = array_values(array_filter($files, fn (string $path): bool => $path !== $infoPath));
+        }
+        $result['files'] = $files;
+        $result['metadata'] = is_array($downloadMetadata) ? $downloadMetadata : [];
         $result['version'] = $this->version();
 
         return $result;
@@ -156,14 +167,53 @@ class YtDlpService implements YoutubeDownloader
 
     public function update(string $channel): array
     {
+        $temporaryPath = null;
         try {
-            $result = $this->run(['--update-to', $channel], null, 120);
-            $message = trim($result['stdout'].PHP_EOL.$result['stderr']);
+            $repository = $channel === 'nightly' ? 'yt-dlp/yt-dlp-nightly-builds' : 'yt-dlp/yt-dlp';
+            $asset = $this->releaseAssetName();
+            $binaryPath = $this->resolveBinaryPath();
+            $temporaryPath = rtrim((string) config('auroraarchive.temp_root'), DIRECTORY_SEPARATOR)
+                .DIRECTORY_SEPARATOR.'yt-dlp-update-'.Str::random(12).(Str::endsWith($asset, '.exe') ? '.exe' : '');
+            File::ensureDirectoryExists(dirname($temporaryPath), 0700);
+
+            $download = Http::withUserAgent('AuroraArchive')
+                ->connectTimeout(5)
+                ->timeout(120)
+                ->retry([250, 1000], throw: false)
+                ->sink($temporaryPath)
+                ->get("https://github.com/{$repository}/releases/latest/download/{$asset}");
+            $downloadSuccessful = $download->successful();
+            $download->close();
+            unset($download);
+            clearstatcache(true, $temporaryPath);
+            if (! $downloadSuccessful || ! is_file($temporaryPath)) {
+                throw new RuntimeException('The official yt-dlp binary could not be downloaded from GitHub.');
+            }
+
+            $checksums = Http::withUserAgent('AuroraArchive')
+                ->connectTimeout(5)
+                ->timeout(15)
+                ->retry([250, 1000], throw: false)
+                ->get("https://github.com/{$repository}/releases/latest/download/SHA2-256SUMS");
+            if (! $checksums->successful() || ! preg_match('/^([a-f0-9]{64})\s+\*?'.preg_quote($asset, '/').'\s*$/mi', $checksums->body(), $matches)) {
+                throw new RuntimeException('The official yt-dlp checksum could not be verified.');
+            }
+            if (! hash_equals(Str::lower($matches[1]), hash_file('sha256', $temporaryPath))) {
+                throw new RuntimeException('The downloaded yt-dlp binary failed checksum verification.');
+            }
+
+            if (PHP_OS_FAMILY !== 'Windows') {
+                chmod($temporaryPath, 0755);
+            }
+            $version = $this->validateBinary($temporaryPath);
+
+            $this->replaceBinary($temporaryPath, $binaryPath);
+            $temporaryPath = null;
 
             return [
-                'successful' => $result['exit_code'] === 0,
-                'message' => $message ?: 'yt-dlp did not return an update status.',
-                'version' => $this->version(),
+                'successful' => true,
+                'message' => "Installed the official {$channel} yt-dlp release.",
+                'version' => $version ?: $this->version(),
             ];
         } catch (Throwable $exception) {
             return [
@@ -171,7 +221,110 @@ class YtDlpService implements YoutubeDownloader
                 'message' => $this->sanitise($exception->getMessage()),
                 'version' => $this->version(),
             ];
+        } finally {
+            if ($temporaryPath !== null && is_file($temporaryPath)) {
+                @unlink($temporaryPath);
+            }
         }
+    }
+
+    private function validateBinary(string $binaryPath): string
+    {
+        $error = '';
+        $attempts = PHP_OS_FAMILY === 'Windows' ? 5 : 1;
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            $validation = new Process([$binaryPath, '--version']);
+            $validation->setEnv($this->processEnvironment((string) config('auroraarchive.temp_root')));
+            $validation->setTimeout(30)->run();
+            if ($validation->isSuccessful()) {
+                return trim($validation->getOutput());
+            }
+
+            $error = $validation->getErrorOutput();
+            unset($validation);
+            if ($attempt < $attempts) {
+                usleep(250_000);
+            }
+        }
+
+        throw new RuntimeException('The downloaded yt-dlp binary could not start: '.$this->sanitise($error));
+    }
+
+    private function releaseAssetName(): string
+    {
+        $architecture = Str::lower(php_uname('m'));
+
+        return match (PHP_OS_FAMILY) {
+            'Windows' => Str::contains($architecture, ['arm64', 'aarch64']) ? 'yt-dlp_arm64.exe' : (Str::contains($architecture, ['x86', 'i386', 'i686']) && ! Str::contains($architecture, ['64']) ? 'yt-dlp_x86.exe' : 'yt-dlp.exe'),
+            'Linux' => Str::contains($architecture, ['arm64', 'aarch64']) ? 'yt-dlp_linux_aarch64' : (Str::contains($architecture, ['x86_64', 'amd64']) ? 'yt-dlp_linux' : throw new RuntimeException("Unsupported Linux architecture: {$architecture}.")),
+            'Darwin' => 'yt-dlp_macos',
+            default => throw new RuntimeException('Automatic yt-dlp updates are not supported on this operating system.'),
+        };
+    }
+
+    private function resolveBinaryPath(): string
+    {
+        $configured = (string) config('auroraarchive.yt_dlp');
+        if (is_file($configured)) {
+            return realpath($configured) ?: $configured;
+        }
+
+        $extensions = PHP_OS_FAMILY === 'Windows' && pathinfo($configured, PATHINFO_EXTENSION) === ''
+            ? ['', '.exe', '.cmd', '.bat']
+            : [''];
+        foreach (explode(PATH_SEPARATOR, (string) getenv('PATH')) as $directory) {
+            foreach ($extensions as $extension) {
+                $candidate = rtrim($directory, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$configured.$extension;
+                if (is_file($candidate)) {
+                    return realpath($candidate) ?: $candidate;
+                }
+            }
+        }
+
+        throw new RuntimeException('The configured yt-dlp executable could not be located for replacement.');
+    }
+
+    private function replaceBinary(string $temporaryPath, string $binaryPath): void
+    {
+        if (! is_writable($binaryPath) || ! is_writable(dirname($binaryPath))) {
+            throw new RuntimeException('The configured yt-dlp executable is not writable. Rebuild the application image to update it.');
+        }
+
+        if (PHP_OS_FAMILY !== 'Windows') {
+            if (! $this->renameFile($temporaryPath, $binaryPath)) {
+                throw new RuntimeException('The yt-dlp executable could not be replaced.');
+            }
+
+            return;
+        }
+
+        $backupPath = $binaryPath.'.aurora-backup';
+        if (is_file($backupPath)) {
+            unlink($backupPath);
+        }
+        if (! $this->renameFile($binaryPath, $backupPath)) {
+            throw new RuntimeException('The existing yt-dlp executable could not be prepared for replacement.');
+        }
+        if (! $this->renameFile($temporaryPath, $binaryPath)) {
+            $this->renameFile($backupPath, $binaryPath);
+            throw new RuntimeException('The yt-dlp executable could not be replaced.');
+        }
+        unlink($backupPath);
+    }
+
+    private function renameFile(string $from, string $to): bool
+    {
+        $attempts = PHP_OS_FAMILY === 'Windows' ? 5 : 1;
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            if (@rename($from, $to)) {
+                return true;
+            }
+            if ($attempt < $attempts) {
+                usleep(250_000);
+            }
+        }
+
+        return false;
     }
 
     /** @param list<string> $arguments @return array{exit_code:int,stdout:string,stderr:string} */

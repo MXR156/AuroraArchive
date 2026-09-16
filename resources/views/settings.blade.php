@@ -6,19 +6,35 @@
         </div>
 
         <section class="rounded-2xl border border-white/10 bg-zinc-900 p-6">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-                <div>
+            <div class="grid gap-5">
+                <div class="flex flex-wrap items-center justify-between gap-4">
                     <h2 class="font-semibold">yt-dlp updates</h2>
-                    <p class="mt-1 text-sm text-zinc-500">Installed version: {{ $ytDlpVersion ?: 'Unavailable' }}</p>
+                    <form method="POST" action="{{ route('settings.yt-dlp.update') }}" class="flex items-center gap-2">
+                        @csrf
+                        <select name="channel" class="field min-w-32" aria-label="yt-dlp release channel">
+                            <option value="nightly">Nightly</option>
+                            <option value="stable">Stable</option>
+                        </select>
+                        <button class="secondary">Update now</button>
+                    </form>
                 </div>
-                <form method="POST" action="{{ route('settings.yt-dlp.update') }}" class="flex items-center gap-2">
-                    @csrf
-                    <select name="channel" class="field min-w-32" aria-label="yt-dlp release channel">
-                        <option value="nightly">Nightly</option>
-                        <option value="stable">Stable</option>
-                    </select>
-                    <button class="secondary">Update now</button>
-                </form>
+
+                <dl class="grid gap-px overflow-hidden rounded-lg border border-white/8 bg-white/8 sm:grid-cols-3">
+                    <div class="bg-zinc-900 px-4 py-3">
+                        <dt class="text-xs font-medium uppercase text-zinc-500">Installed</dt>
+                        <dd class="mt-1 break-all text-sm text-zinc-200">{{ $ytDlpVersion ?: 'Unavailable' }}</dd>
+                    </div>
+                    @foreach(['stable' => 'Latest stable', 'nightly' => 'Latest nightly'] as $channel => $label)
+                        <div class="bg-zinc-900 px-4 py-3">
+                            <dt class="text-xs font-medium uppercase text-zinc-500">{{ $label }}</dt>
+                            <dd class="mt-1 break-all text-sm">
+                                <a href="{{ $ytDlpReleaseVersions[$channel]['url'] }}" target="_blank" rel="noopener noreferrer" class="text-zinc-200 hover:text-white hover:underline">
+                                    {{ $ytDlpReleaseVersions[$channel]['version'] ?: 'Unavailable' }}
+                                </a>
+                            </dd>
+                        </div>
+                    @endforeach
+                </dl>
             </div>
         </section>
 

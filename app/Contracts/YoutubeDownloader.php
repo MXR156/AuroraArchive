@@ -10,7 +10,7 @@ interface YoutubeDownloader
     /** @return list<array<string, mixed>> */
     public function discover(Source $source): array;
 
-    /** @return array{exit_code:int,stdout:string,stderr:string,files:list<string>,version:?string} */
+    /** @return array{exit_code:int,stdout:string,stderr:string,files:list<string>,version:?string,metadata?:array<string,mixed>} */
     public function download(Media $media): array;
 
     /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */

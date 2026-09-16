@@ -5,6 +5,7 @@ use App\Enums\MediaStatus;
 use App\Jobs\DownloadMedia;
 use App\Jobs\ScanSource;
 use App\Models\Media;
+use App\Models\MediaFile;
 use App\Models\MediaTombstone;
 use App\Models\Source;
 use App\Models\User;
@@ -94,6 +95,61 @@ it('does not downgrade an archived video when youtube later reports it unavailab
         ->and($medium->description)->toBe('Archived description')
         ->and($medium->channel_name)->toBe('Archived channel')
         ->and(data_get($medium->metadata, 'youtube.unavailable'))->toBeTrue();
+});
+
+it('preserves archived metadata based on the file even when its status has drifted', function () {
+    Queue::fake();
+    $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+    $medium = Media::query()->create([
+        'source_id' => $source->id,
+        'youtube_id' => 'archived123',
+        'title' => 'Permanent archived title',
+        'description' => 'Permanent archived description',
+        'channel_name' => 'Permanent archived channel',
+        'original_url' => 'https://www.youtube.com/watch?v=archived123',
+        'status' => MediaStatus::Failed,
+    ]);
+    MediaFile::query()->create(['media_id' => $medium->id, 'path' => 'channel/archived123.mp4']);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('discover')->once()->andReturn([['id' => 'archived123', 'title' => '[Private video]', 'availability' => 'private']]);
+
+    (new ScanSource($source))->handle($youtube);
+
+    $medium->refresh();
+    expect($medium->status)->toBe(MediaStatus::Downloaded)
+        ->and($medium->title)->toBe('Permanent archived title')
+        ->and($medium->description)->toBe('Permanent archived description')
+        ->and($medium->channel_name)->toBe('Permanent archived channel');
+});
+
+it('does not rewrite catalogue metadata after a file has been archived', function () {
+    Queue::fake();
+    $source = Source::create(['user_id' => User::factory()->create()->id, 'type' => 'playlist', 'external_id' => 'PL1', 'name' => 'Playlist', 'url' => 'https://youtube.com/playlist?list=PL1']);
+    $medium = Media::query()->create([
+        'source_id' => $source->id,
+        'youtube_id' => 'archived123',
+        'title' => 'Original archived title',
+        'description' => 'Original archived description',
+        'channel_name' => 'Original archived channel',
+        'original_url' => 'https://www.youtube.com/watch?v=archived123',
+        'status' => MediaStatus::Downloaded,
+    ]);
+    MediaFile::query()->create(['media_id' => $medium->id, 'path' => 'channel/archived123.mp4']);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('discover')->once()->andReturn([[
+        'id' => 'archived123',
+        'title' => 'Changed YouTube title',
+        'description' => 'Changed YouTube description',
+        'channel' => 'Changed YouTube channel',
+        'availability' => 'public',
+    ]]);
+
+    (new ScanSource($source))->handle($youtube);
+
+    $medium->refresh();
+    expect($medium->title)->toBe('Original archived title')
+        ->and($medium->description)->toBe('Original archived description')
+        ->and($medium->channel_name)->toBe('Original archived channel');
 });
 
 it('ignores deliberately deleted media IDs during later scans', function () {

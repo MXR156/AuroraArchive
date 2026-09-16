@@ -6,6 +6,7 @@ use App\Jobs\DownloadMedia;
 use App\Models\Media;
 use App\Services\YtDlpService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Facades\File;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -65,3 +66,47 @@ it('classifies youtube availability conservatively', function (string $error, st
     ['ERROR: Sign in to confirm your age', 'unknown'],
     ['ERROR: HTTP Error 429: Too Many Requests', 'unknown'],
 ]);
+
+it('stores the authoritative metadata snapshot when a download succeeds', function () {
+    $root = storage_path('framework/testing/download-metadata');
+    File::ensureDirectoryExists($root.'/Creator');
+    config()->set('auroraarchive.media_root', $root);
+    $path = $root.'/Creator/video [AAAAAAAAAAA].mp4';
+    File::put($path, 'archived video');
+    $medium = Media::query()->create([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'title' => 'Sparse playlist title',
+        'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
+        'status' => MediaStatus::Queued,
+    ]);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('download')->once()->andReturn([
+        'exit_code' => 0,
+        'stdout' => '',
+        'stderr' => '',
+        'files' => [$path],
+        'version' => 'nightly',
+        'metadata' => [
+            'title' => 'Authoritative archived title',
+            'description' => 'Authoritative archived description',
+            'channel' => 'Authoritative channel',
+            'channel_id' => 'UCARCHIVE',
+            'timestamp' => 1_700_000_000,
+            'duration' => 125,
+        ],
+    ]);
+
+    (new DownloadMedia($medium))->handle($youtube);
+
+    $medium->refresh();
+    expect($medium->status)->toBe(MediaStatus::Downloaded)
+        ->and($medium->title)->toBe('Authoritative archived title')
+        ->and($medium->description)->toBe('Authoritative archived description')
+        ->and($medium->channel_name)->toBe('Authoritative channel')
+        ->and($medium->channel_id)->toBe('UCARCHIVE')
+        ->and($medium->duration_seconds)->toBe(125)
+        ->and(data_get($medium->metadata, 'youtube.archive_snapshot.title'))->toBe('Authoritative archived title')
+        ->and($medium->files()->exists())->toBeTrue();
+
+    File::deleteDirectory($root);
+});

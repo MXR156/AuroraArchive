@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Contracts\YoutubeDownloader;
 use App\Models\YoutubeCredential;
+use App\Services\YtDlpReleaseVersions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -12,11 +13,12 @@ use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    public function edit(Request $request, YoutubeDownloader $youtube): View
+    public function edit(Request $request, YoutubeDownloader $youtube, YtDlpReleaseVersions $releaseVersions): View
     {
         return view('settings', [
             'credential' => YoutubeCredential::query()->whereBelongsTo($request->user())->first(),
             'ytDlpVersion' => $youtube->version(),
+            'ytDlpReleaseVersions' => $releaseVersions->get(),
         ]);
     }
 

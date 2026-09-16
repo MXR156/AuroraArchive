@@ -50,8 +50,9 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
                 continue;
             }
 
-            $medium = Media::query()->firstOrNew(['youtube_id' => $youtubeId]);
+            $medium = Media::query()->withExists('files')->firstOrNew(['youtube_id' => $youtubeId]);
             $isNew = ! $medium->exists;
+            $hasArchivedFile = ! $isNew && ($medium->status === MediaStatus::Downloaded || (bool) $medium->files_exists);
             $metadata = array_replace_recursive($medium->metadata ?? [], Arr::only($entry, ['availability', 'live_status']));
             $isUnavailable = $this->isUnavailable($entry);
             if ($isUnavailable) {
@@ -66,18 +67,17 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
                 Arr::forget($metadata, 'youtube.unavailable_at');
             }
 
-            $preserveArchivedMetadata = $isUnavailable && ! $isNew && $medium->status === MediaStatus::Downloaded;
             $medium->fill([
                 'source_id' => $isNew ? $this->source->id : $medium->source_id,
-                'title' => $preserveArchivedMetadata || Arr::get($metadata, 'manual.title') ? $medium->title : (string) ($entry['title'] ?? $youtubeId),
-                'description' => $preserveArchivedMetadata || Arr::get($metadata, 'manual.description') ? $medium->description : Arr::get($entry, 'description'),
-                'channel_name' => $preserveArchivedMetadata || Arr::get($metadata, 'manual.channel_name') ? $medium->channel_name : (Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader')),
-                'channel_id' => $preserveArchivedMetadata ? $medium->channel_id : (Arr::get($entry, 'channel_id') ?: $medium->channel_id),
-                'published_at' => $preserveArchivedMetadata || blank(Arr::get($entry, 'timestamp')) ? $medium->published_at : now()->setTimestamp((int) Arr::get($entry, 'timestamp')),
-                'duration_seconds' => $preserveArchivedMetadata ? $medium->duration_seconds : (Arr::get($entry, 'duration') ?: $medium->duration_seconds),
-                'thumbnail_url' => $preserveArchivedMetadata ? $medium->getRawOriginal('thumbnail_url') : (Arr::get($entry, 'thumbnail') ?: $medium->getRawOriginal('thumbnail_url')),
+                'title' => Arr::get($metadata, 'manual.title') ? $medium->title : ($hasArchivedFile ? $this->preservedTitle($medium->title, Arr::get($entry, 'title'), $youtubeId) : (filled(Arr::get($entry, 'title')) ? (string) Arr::get($entry, 'title') : ($medium->title ?: $youtubeId))),
+                'description' => Arr::get($metadata, 'manual.description') ? $medium->description : ($hasArchivedFile ? ($medium->description ?: Arr::get($entry, 'description')) : (Arr::get($entry, 'description') ?: $medium->description)),
+                'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $medium->channel_name : ($hasArchivedFile ? ($medium->channel_name ?: Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader')) : (Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader') ?: $medium->channel_name)),
+                'channel_id' => $medium->channel_id ?: Arr::get($entry, 'channel_id'),
+                'published_at' => $medium->published_at ?: (filled(Arr::get($entry, 'timestamp')) ? now()->setTimestamp((int) Arr::get($entry, 'timestamp')) : null),
+                'duration_seconds' => $medium->duration_seconds ?: Arr::get($entry, 'duration'),
+                'thumbnail_url' => $medium->getRawOriginal('thumbnail_url') ?: Arr::get($entry, 'thumbnail'),
                 'original_url' => 'https://www.youtube.com/watch?v='.$youtubeId,
-                'status' => $isUnavailable && ! $preserveArchivedMetadata ? MediaStatus::Failed : ($isNew ? MediaStatus::Discovered : $medium->status),
+                'status' => $isUnavailable && ! $hasArchivedFile ? MediaStatus::Failed : ($hasArchivedFile ? MediaStatus::Downloaded : ($isNew ? MediaStatus::Discovered : $medium->status)),
                 'metadata' => $metadata,
             ])->save();
             if ($isNew && ! $isUnavailable && $this->source->auto_download) {
@@ -99,6 +99,23 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
 
         return in_array($availability, ['private', 'unavailable', 'needs_auth', 'subscriber_only', 'premium_only'], true)
             || Str::contains($title, ['[deleted video]', '[private video]', '[unavailable video]']);
+    }
+
+    private function preservedTitle(?string $current, mixed $incoming, string $youtubeId): string
+    {
+        if ($this->isUsefulTitle($current, $youtubeId)) {
+            return $current;
+        }
+
+        return $this->isUsefulTitle($incoming, $youtubeId) ? (string) $incoming : ($current ?: $youtubeId);
+    }
+
+    private function isUsefulTitle(mixed $title, string $youtubeId): bool
+    {
+        return is_string($title)
+            && filled($title)
+            && $title !== $youtubeId
+            && ! Str::contains(Str::lower($title), ['[deleted video]', '[private video]', '[unavailable video]']);
     }
 
     public function failed(?Throwable $exception): void
