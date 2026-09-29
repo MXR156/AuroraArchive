@@ -1,4 +1,7 @@
 # syntax=docker/dockerfile:1.7
+ARG BGUTIL_VERSION=2.0.0
+FROM brainicism/bgutil-ytdlp-pot-provider:${BGUTIL_VERSION}-deno AS pot_provider
+
 FROM node:24-bookworm-slim AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -15,6 +18,7 @@ RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --opt
 FROM php:8.5-fpm-bookworm
 ARG TARGETARCH
 ARG YT_DLP_CHANNEL=nightly
+ARG BGUTIL_VERSION=2.0.0
 LABEL org.opencontainers.image.source="https://github.com/MXR156/AuroraArchive" \
       org.opencontainers.image.title="AuroraArchive" \
       org.opencontainers.image.description="A private, self-hosted YouTube archiver and local streaming library."
@@ -32,8 +36,11 @@ RUN case "$TARGETARCH" in amd64) YTDLP_ARCH=""; DENO_ARCH="x86_64" ;; arm64) YTD
     && chmod 0755 /usr/local/bin/yt-dlp \
     && curl -fsSL "https://github.com/denoland/deno/releases/latest/download/deno-${DENO_ARCH}-unknown-linux-gnu.zip" -o /tmp/deno.zip \
     && unzip /tmp/deno.zip -d /usr/local/bin && chmod 0755 /usr/local/bin/deno \
+    && mkdir -p /opt/yt-dlp-plugins \
+    && curl -fsSL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_VERSION}/bgutil-ytdlp-pot-provider.zip" -o /opt/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip \
     && apt-get purge -y --auto-remove unzip \
     && rm -rf /var/lib/apt/lists/* /tmp/deno.zip /var/www/html/*
+COPY --from=pot_provider /app /opt/bgutil-provider
 WORKDIR /var/www/html
 ENV APP_NAME=AuroraArchive \
     APP_ENV=production \
@@ -55,6 +62,8 @@ ENV APP_NAME=AuroraArchive \
     MEDIA_ACCELERATED_STREAMING=true \
     AURORAARCHIVE_CONFIG_ROOT=/config \
     YT_DLP_BINARY=/var/www/html/storage/app/bin/yt-dlp \
+    YT_DLP_PLUGIN_DIR=/opt/yt-dlp-plugins \
+    YT_DLP_POT_PROVIDER_URL=http://127.0.0.1:4416 \
     AURORAARCHIVE_TEMP_ROOT=/var/www/html/storage/app/tmp \
     TMPDIR=/var/www/html/storage/app/tmp \
     TMP=/var/www/html/storage/app/tmp \
@@ -75,7 +84,7 @@ RUN rm -f bootstrap/cache/*.php && php artisan package:discover --ansi \
     && chmod 0755 /usr/local/bin/auroraarchive-entrypoint \
     && mkdir -p /media /config storage/app/bin storage/app/tmp storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && cp /usr/local/bin/yt-dlp storage/app/bin/yt-dlp && chmod 0755 storage/app/bin/yt-dlp \
-    && chown -R www-data:www-data /var/www/html /media /config
+    && chown -R www-data:www-data /var/www/html /media /config /opt/bgutil-provider
 EXPOSE 80
 VOLUME ["/media", "/config"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD curl -fsS http://127.0.0.1/up || exit 1

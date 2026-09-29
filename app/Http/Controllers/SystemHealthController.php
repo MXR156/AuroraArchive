@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Contracts\YoutubeDownloader;
 use App\Models\YoutubeCredential;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\View\View;
 use Throwable;
@@ -15,7 +16,7 @@ class SystemHealthController extends Controller
     {
         $credential = auth()->check() ? YoutubeCredential::query()->whereBelongsTo(auth()->user())->first() : null;
         $ytDlpVersion = $youtube->version();
-        $checks = [['name' => 'Laravel', 'value' => app()->version(), 'healthy' => true], ['name' => 'PHP', 'value' => PHP_VERSION, 'healthy' => true], $this->database(), $this->storage(), $this->process('Queue worker', 'queue:work'), $this->process('Scheduler', 'schedule:work'), ['name' => 'yt-dlp', 'value' => $ytDlpVersion ?: 'Unavailable', 'healthy' => $ytDlpVersion !== null], $this->binary('Deno', config('auroraarchive.deno')), $this->binary('FFmpeg', config('auroraarchive.ffmpeg'), '-version'), ['name' => 'YouTube cookies', 'value' => $credential?->status_message ?: 'Not configured', 'healthy' => $credential?->status->value === 'valid']];
+        $checks = [['name' => 'Laravel', 'value' => app()->version(), 'healthy' => true], ['name' => 'PHP', 'value' => PHP_VERSION, 'healthy' => true], $this->database(), $this->storage(), $this->process('Queue worker', 'queue:work'), $this->process('Scheduler', 'schedule:work'), ['name' => 'yt-dlp', 'value' => $ytDlpVersion ?: 'Unavailable', 'healthy' => $ytDlpVersion !== null], $this->potProvider(), $this->binary('Deno', config('auroraarchive.deno')), $this->binary('FFmpeg', config('auroraarchive.ffmpeg'), '-version'), ['name' => 'YouTube cookies', 'value' => $credential?->status_message ?: 'Not configured', 'healthy' => $credential?->status->value === 'valid']];
 
         return view('system-health', compact('checks'));
     }
@@ -38,6 +39,27 @@ class SystemHealthController extends Controller
         $path = config('auroraarchive.media_root');
 
         return ['name' => 'Media storage', 'value' => $path, 'healthy' => is_dir($path) && is_writable($path)];
+    }
+
+    private function potProvider(): array
+    {
+        $url = config('auroraarchive.yt_dlp_pot_provider_url');
+        if (blank($url)) {
+            return ['name' => 'YouTube PO token provider', 'value' => 'Not configured', 'healthy' => true];
+        }
+
+        try {
+            $response = Http::connectTimeout(2)->timeout(5)->get(rtrim((string) $url, '/').'/ping');
+            $version = $response->json('version');
+
+            return [
+                'name' => 'YouTube PO token provider',
+                'value' => $response->successful() ? 'Running'.(filled($version) ? ' (v'.$version.')' : '') : 'HTTP '.$response->status(),
+                'healthy' => $response->successful(),
+            ];
+        } catch (Throwable $exception) {
+            return ['name' => 'YouTube PO token provider', 'value' => $exception->getMessage(), 'healthy' => false];
+        }
     }
 
     private function process(string $name, string $pattern): array
