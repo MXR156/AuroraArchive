@@ -99,7 +99,20 @@ class YtDlpService implements YoutubeDownloader
             }
         }
 
-        return $this->availabilityResult($result);
+        $ytDlpAvailability = $this->availabilityResult($result);
+        if ($ytDlpAvailability['status'] === 'unavailable') {
+            return $ytDlpAvailability;
+        }
+
+        $webpageAvailability = $this->webpageAvailability($media);
+        if ($webpageAvailability['status'] === 'unavailable') {
+            return $webpageAvailability;
+        }
+        if ($ytDlpAvailability['status'] === 'available') {
+            return $ytDlpAvailability;
+        }
+
+        return $webpageAvailability['status'] === 'available' ? $webpageAvailability : $ytDlpAvailability;
     }
 
     /** @param array{exit_code:int,stdout:string,stderr:string} $result @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
@@ -134,6 +147,108 @@ class YtDlpService implements YoutubeDownloader
         }
 
         return ['status' => 'unknown', 'reason' => Str::limit(trim($result['stderr']), 500, '')];
+    }
+
+    /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
+    private function webpageAvailability(Media $media): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'Accept-Language' => 'en-GB,en;q=0.9',
+                'User-Agent' => 'Mozilla/5.0 (compatible; AuroraArchive/1.0)',
+            ])->withCookie('CONSENT', 'YES+cb', '.youtube.com')
+                ->connectTimeout(5)
+                ->timeout(15)
+                ->retry([250, 1000], throw: false)
+                ->get('https://www.youtube.com/watch', [
+                    'v' => $media->youtube_id,
+                    'hl' => 'en',
+                    'has_verified' => '1',
+                    'bpctr' => '9999999999',
+                ]);
+            if (! $response->successful()) {
+                return ['status' => 'unknown', 'reason' => 'YouTube watch page returned HTTP '.$response->status().'.'];
+            }
+
+            return $this->webpageAvailabilityResult($response->body());
+        } catch (Throwable $exception) {
+            return ['status' => 'unknown', 'reason' => Str::limit($this->sanitise($exception->getMessage()), 500, '')];
+        }
+    }
+
+    /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
+    private function webpageAvailabilityResult(string $html): array
+    {
+        $playability = $this->jsonObjectAfter($html, '"playabilityStatus":');
+        if ($playability === null) {
+            return ['status' => 'unknown', 'reason' => 'YouTube watch page did not expose a player status.'];
+        }
+
+        $status = Str::upper((string) Arr::get($playability, 'status'));
+        $reason = (string) (Arr::get($playability, 'reason')
+            ?: Arr::get($playability, 'messages.0')
+            ?: Arr::get($playability, 'errorScreen.playerErrorMessageRenderer.reason.simpleText'));
+        $normalisedReason = Str::lower($reason);
+
+        if ($status === 'OK') {
+            return ['status' => 'available', 'reason' => null];
+        }
+        if (Str::contains($normalisedReason, [
+            'video unavailable',
+            'private video',
+            'has been removed',
+            'no longer available',
+            'account associated with this video has been terminated',
+            'copyright claim',
+        ])) {
+            return ['status' => 'unavailable', 'reason' => Str::limit($reason, 500, '')];
+        }
+
+        return ['status' => 'unknown', 'reason' => Str::limit($reason ?: 'YouTube returned player status '.$status.'.', 500, '')];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function jsonObjectAfter(string $value, string $marker): ?array
+    {
+        $markerPosition = strpos($value, $marker);
+        if ($markerPosition === false) {
+            return null;
+        }
+
+        $start = strpos($value, '{', $markerPosition + strlen($marker));
+        if ($start === false) {
+            return null;
+        }
+
+        $depth = 0;
+        $insideString = false;
+        $escaped = false;
+        $length = strlen($value);
+        for ($position = $start; $position < $length; $position++) {
+            $character = $value[$position];
+            if ($insideString) {
+                if ($escaped) {
+                    $escaped = false;
+                } elseif ($character === '\\') {
+                    $escaped = true;
+                } elseif ($character === '"') {
+                    $insideString = false;
+                }
+
+                continue;
+            }
+            if ($character === '"') {
+                $insideString = true;
+            } elseif ($character === '{') {
+                $depth++;
+            } elseif ($character === '}' && --$depth === 0) {
+                $decoded = json_decode(substr($value, $start, $position - $start + 1), true);
+
+                return is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        return null;
     }
 
     /** @param array{exit_code:int,stdout:string,stderr:string} $result */

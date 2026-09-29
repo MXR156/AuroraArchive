@@ -67,6 +67,26 @@ it('classifies youtube availability conservatively', function (string $error, st
     ['ERROR: HTTP Error 429: Too Many Requests', 'unknown'],
 ]);
 
+it('classifies structured youtube watch page player states', function (string $playabilityStatus, string $expectedStatus) {
+    $method = new ReflectionMethod(YtDlpService::class, 'webpageAvailabilityResult');
+    $html = '<html><script>var data = {"playabilityStatus":'.$playabilityStatus.',"videoDetails":{"videoId":"AAAAAAAAAAA"}};</script></html>';
+
+    expect($method->invoke(app(YtDlpService::class), $html)['status'])->toBe($expectedStatus);
+})->with([
+    'available' => ['{"status":"OK","playableInEmbed":true}', 'available'],
+    'removed' => ['{"status":"ERROR","reason":"This video has been removed by the uploader"}', 'unavailable'],
+    'private' => ['{"status":"LOGIN_REQUIRED","reason":"This is a private video"}', 'unavailable'],
+    'terminated channel' => ['{"status":"ERROR","reason":"Video unavailable. The account associated with this video has been terminated."}', 'unavailable'],
+    'age gate remains inconclusive' => ['{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm your age"}', 'unknown'],
+    'bot challenge remains inconclusive' => ['{"status":"LOGIN_REQUIRED","reason":"Sign in to confirm you are not a bot"}', 'unknown'],
+]);
+
+it('does not infer removal when youtube omits its player status', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'webpageAvailabilityResult');
+
+    expect($method->invoke(app(YtDlpService::class), '<html>Consent required</html>')['status'])->toBe('unknown');
+});
+
 it('stores the authoritative metadata snapshot when a download succeeds', function () {
     $root = storage_path('framework/testing/download-metadata');
     File::ensureDirectoryExists($root.'/Creator');
