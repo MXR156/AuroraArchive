@@ -110,3 +110,36 @@ it('stores the authoritative metadata snapshot when a download succeeds', functi
 
     File::deleteDirectory($root);
 });
+
+it('uses the web safari fallback only for age restricted sabr failures', function (string $error, bool $expected) {
+    $method = new ReflectionMethod(YtDlpService::class, 'requiresSabrFallback');
+    $result = ['exit_code' => 1, 'stdout' => '', 'stderr' => $error];
+
+    expect($method->invoke(app(YtDlpService::class), $result))->toBe($expected);
+})->with([
+    ['Some web_creator formats are missing a URL due to SABR. Sorry, this content is age-restricted', true],
+    ['Sorry, this content is age-restricted', false],
+    ['Some formats are missing a URL due to SABR', false],
+    ['Video unavailable', false],
+]);
+
+it('reports age verification failures separately from unavailable videos', function () {
+    $medium = Media::query()->create([
+        'youtube_id' => '3gKhBhpSn_A',
+        'title' => 'Age restricted video',
+        'original_url' => 'https://www.youtube.com/watch?v=3gKhBhpSn_A',
+        'status' => MediaStatus::Queued,
+    ]);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('download')->once()->andReturn([
+        'exit_code' => 1,
+        'stdout' => '',
+        'stderr' => 'Some web_creator formats are missing a URL due to SABR. ERROR: Sorry, this content is age-restricted',
+        'files' => [],
+        'version' => 'nightly',
+    ]);
+
+    expect(fn () => (new DownloadMedia($medium))->handle($youtube))
+        ->toThrow(RuntimeException::class, 'Age verification / PO token required');
+    expect($medium->attempts()->firstOrFail()->error_category)->toBe('Age verification / PO token required');
+});

@@ -97,6 +97,7 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
         $error = Str::lower($error);
 
         return match (true) {
+            Str::contains($error, ['age-restricted', 'confirm your age']) => 'Age verification / PO token required',
             Str::contains($error, ['sign in', 'cookies']) => 'Authentication',
             Str::contains($error, ['429', 'too many requests']) => 'Rate limiting',
             Str::contains($error, ['playback on other websites has been disabled', 'embedding disabled']) => 'Playback restricted',
