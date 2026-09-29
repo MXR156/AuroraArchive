@@ -164,3 +164,22 @@ it('adds the configured po token provider plugin to yt dlp calls', function () {
         'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416',
     ]);
 });
+
+it('uses forced po token clients only for the matching age restricted sabr failure', function (string $error, bool $expected) {
+    $method = new ReflectionMethod(YtDlpService::class, 'requiresPotClientFallback');
+    $result = ['exit_code' => 1, 'stdout' => '', 'stderr' => $error];
+
+    expect($method->invoke(app(YtDlpService::class), $result))->toBe($expected);
+})->with([
+    ['Some web_creator formats are missing a URL due to SABR. Sorry, this content is age-restricted', true],
+    ['web_creator requires a PO Token. Sign in to confirm your age', true],
+    ['Sorry, this content is age-restricted', false],
+    ['Some formats are missing a URL due to SABR', false],
+    ['Video unavailable', false],
+]);
+
+it('prefers the mweb po token client because it exposes adaptive video formats', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'potFallbackClients');
+
+    expect($method->invoke(app(YtDlpService::class)))->toBe(['mweb', 'web_creator']);
+});

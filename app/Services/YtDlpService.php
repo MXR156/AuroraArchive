@@ -53,6 +53,21 @@ class YtDlpService implements YoutubeDownloader
         ];
         $cookies = $this->cookiesFor($media->source?->user_id);
         $result = $this->run($arguments, $cookies, 7200);
+        if (filled($cookies) && $this->potProviderConfigured() && $this->requiresPotClientFallback($result)) {
+            foreach ($this->potFallbackClients() as $client) {
+                $fallback = $this->run([
+                    '--extractor-args',
+                    "youtube:player_client={$client};fetch_pot=always",
+                    ...$arguments,
+                ], $cookies, 7200);
+                if ($fallback['exit_code'] === 0) {
+                    $result = $fallback;
+                    break;
+                }
+
+                $result['stderr'] .= PHP_EOL.$client.' PO-token fallback:'.PHP_EOL.$fallback['stderr'];
+            }
+        }
         if (filled($cookies) && $this->requiresUnauthenticatedRetry($result)) {
             $retry = $this->run($arguments, null, 7200);
             if ($retry['exit_code'] === 0) {
@@ -247,6 +262,16 @@ class YtDlpService implements YoutubeDownloader
                 'playback on other websites has been disabled',
                 'embedding disabled',
             ]);
+    }
+
+    /** @param array{exit_code:int,stdout:string,stderr:string} $result */
+    private function requiresPotClientFallback(array $result): bool
+    {
+        $error = Str::lower($result['stderr']);
+
+        return $result['exit_code'] !== 0
+            && Str::contains($error, ['age-restricted', 'confirm your age'])
+            && Str::contains($error, ['sabr', 'missing a url', 'po token']);
     }
 
     public function testAuthentication(string $cookies): array
@@ -495,6 +520,18 @@ class YtDlpService implements YoutubeDownloader
             '--extractor-args',
             'youtubepot-bgutilhttp:base_url='.rtrim((string) $providerUrl, '/'),
         ];
+    }
+
+    private function potProviderConfigured(): bool
+    {
+        return filled(config('auroraarchive.yt_dlp_plugin_dir'))
+            && filled(config('auroraarchive.yt_dlp_pot_provider_url'));
+    }
+
+    /** @return list<string> */
+    private function potFallbackClients(): array
+    {
+        return ['mweb', 'web_creator'];
     }
 
     /** @return array<string, string> */
