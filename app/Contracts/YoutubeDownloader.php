@@ -13,7 +13,7 @@ interface YoutubeDownloader
     /** @return array{exit_code:int,stdout:string,stderr:string,files:list<string>,version:?string,metadata?:array<string,mixed>} */
     public function download(Media $media): array;
 
-    /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
+    /** @return array{status:'available'|'unavailable'|'unknown',reason:?string,evidence?:array<string, array{status:string,reason:?string}>} */
     public function checkAvailability(Media $media): array;
 
     /** @return array{status:string,message:string} */

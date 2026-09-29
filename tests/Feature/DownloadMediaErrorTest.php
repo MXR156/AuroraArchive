@@ -87,6 +87,18 @@ it('does not infer removal when youtube omits its player status', function () {
     expect($method->invoke(app(YtDlpService::class), '<html>Consent required</html>')['status'])->toBe('unknown');
 });
 
+it('does not mark a video unavailable when another youtube probe confirms it is playable', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'consolidateAvailability');
+    $result = $method->invoke(app(YtDlpService::class), [
+        'yt_dlp' => ['status' => 'unavailable', 'reason' => 'Video unavailable'],
+        'watch_page' => ['status' => 'available', 'reason' => null],
+    ]);
+
+    expect($result['status'])->toBe('available')
+        ->and($result['evidence']['yt_dlp']['status'])->toBe('unavailable')
+        ->and($result['evidence']['watch_page']['status'])->toBe('available');
+});
+
 it('stores the authoritative metadata snapshot when a download succeeds', function () {
     $root = storage_path('framework/testing/download-metadata');
     File::ensureDirectoryExists($root.'/Creator');

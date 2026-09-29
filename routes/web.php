@@ -29,6 +29,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/subscriptions/{source}', [SourceController::class, 'destroy'])->name('sources.destroy');
     Route::get('/library', LibraryController::class)->name('library');
     Route::post('/library/check-youtube-availability', [LibraryController::class, 'checkAvailability'])->name('library.check-availability');
+    Route::get('/library/youtube-availability-status', [LibraryController::class, 'availabilityStatus'])->name('library.availability-status');
     Route::get('/playlists', [PlaylistController::class, 'index'])->name('playlists.index');
     Route::post('/playlists', [PlaylistController::class, 'store'])->name('playlists.store');
     Route::get('/playlists/{playlist}', [PlaylistController::class, 'show'])->name('playlists.show');

@@ -103,19 +103,35 @@ class YtDlpService implements YoutubeDownloader
         }
 
         $ytDlpAvailability = $this->availabilityResult($result);
-        if ($ytDlpAvailability['status'] === 'unavailable') {
-            return $ytDlpAvailability;
-        }
-
         $webpageAvailability = $this->webpageAvailability($media);
-        if ($webpageAvailability['status'] === 'unavailable') {
-            return $webpageAvailability;
-        }
-        if ($ytDlpAvailability['status'] === 'available') {
-            return $ytDlpAvailability;
+
+        return $this->consolidateAvailability([
+            'yt_dlp' => $ytDlpAvailability,
+            'watch_page' => $webpageAvailability,
+        ]);
+    }
+
+    /**
+     * @param  array<string, array{status:'available'|'unavailable'|'unknown',reason:?string}>  $evidence
+     * @return array{status:'available'|'unavailable'|'unknown',reason:?string,evidence:array<string, array{status:string,reason:?string}>}
+     */
+    private function consolidateAvailability(array $evidence): array
+    {
+        $available = collect($evidence)->firstWhere('status', 'available');
+        if ($available !== null) {
+            return ['status' => 'available', 'reason' => null, 'evidence' => $evidence];
         }
 
-        return $webpageAvailability['status'] === 'available' ? $webpageAvailability : $ytDlpAvailability;
+        $unavailable = collect($evidence)->firstWhere('status', 'unavailable');
+        if ($unavailable !== null) {
+            return ['status' => 'unavailable', 'reason' => $unavailable['reason'], 'evidence' => $evidence];
+        }
+
+        return [
+            'status' => 'unknown',
+            'reason' => $ytDlpAvailability['reason'] ?: $webpageAvailability['reason'],
+            'evidence' => $evidence,
+        ];
     }
 
     /** @param array{exit_code:int,stdout:string,stderr:string} $result @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
@@ -182,7 +198,11 @@ class YtDlpService implements YoutubeDownloader
     /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */
     private function webpageAvailabilityResult(string $html): array
     {
-        $playability = $this->jsonObjectAfter($html, '"playabilityStatus":');
+        $playerResponse = $this->jsonObjectAfter($html, 'ytInitialPlayerResponse');
+        $playability = is_array($playerResponse) ? Arr::get($playerResponse, 'playabilityStatus') : null;
+        if (! is_array($playability)) {
+            $playability = $this->jsonObjectAfter($html, '"playabilityStatus":');
+        }
         if ($playability === null) {
             return ['status' => 'unknown', 'reason' => 'YouTube watch page did not expose a player status.'];
         }

@@ -72,6 +72,27 @@
             @if($medium->description)
                 <div class="mt-6 whitespace-pre-line rounded-2xl bg-zinc-900 p-5 text-sm leading-6 text-zinc-300">{{ $medium->description }}</div>
             @endif
+            @if(data_get($medium->metadata, 'youtube.availability_checked_at'))
+                <section class="mt-8 border-t border-white/10 pt-5">
+                    <h2 class="text-sm font-semibold">YouTube availability diagnostics</h2>
+                    <p class="mt-2 text-sm text-zinc-400">
+                        {{ ucfirst(data_get($medium->metadata, 'youtube.availability_check_status', 'unknown')) }}
+                        &middot; {{ \Illuminate\Support\Carbon::parse(data_get($medium->metadata, 'youtube.availability_checked_at'))->diffForHumans() }}
+                    </p>
+                    @if(data_get($medium->metadata, 'youtube.availability_check_reason'))
+                        <p class="mt-2 text-xs text-zinc-500">{{ data_get($medium->metadata, 'youtube.availability_check_reason') }}</p>
+                    @endif
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                        @foreach(data_get($medium->metadata, 'youtube.availability_check_evidence', []) as $probe => $evidence)
+                            <div class="border border-white/8 bg-zinc-900 p-3 text-xs">
+                                <strong class="text-zinc-200">{{ str($probe)->replace('_', ' ')->headline() }}</strong>
+                                <span class="ml-2 text-zinc-400">{{ ucfirst(data_get($evidence, 'status', 'unknown')) }}</span>
+                                @if(data_get($evidence, 'reason'))<p class="mt-1 text-zinc-500">{{ data_get($evidence, 'reason') }}</p>@endif
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
             @if($medium->attempts->isNotEmpty())
                 <section class="mt-8">
                     <h2 class="mb-3 text-lg font-semibold">Download diagnostics</h2>

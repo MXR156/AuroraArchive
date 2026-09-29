@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Media;
+use App\Services\AvailabilityAudit;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -20,13 +21,27 @@ class QueueMediaAvailabilityChecks implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 3600;
 
-    public function handle(): void
+    public function __construct(public ?string $auditId = null)
     {
-        Media::query()
-            ->whereHas('files')
+        $this->onQueue('maintenance');
+    }
+
+    public function uniqueId(): string
+    {
+        return 'youtube-availability-audit';
+    }
+
+    public function handle(AvailabilityAudit $audit): void
+    {
+        $query = Media::query()->whereHas('files');
+        if ($this->auditId !== null) {
+            $audit->start($this->auditId, (clone $query)->count());
+        }
+
+        $query
             ->select('id')
             ->chunkById(250, fn ($media) => $media->each(function (Media $medium): void {
-                CheckMediaAvailability::dispatch($medium);
+                CheckMediaAvailability::dispatch($medium, $this->auditId);
                 GenerateMediaThumbnail::dispatch($medium);
             }));
     }

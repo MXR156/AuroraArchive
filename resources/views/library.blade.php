@@ -11,6 +11,24 @@
             </form>
         </header>
 
+        @if($availabilityAudit)
+            <section class="border-y border-white/10 py-4" data-availability-audit data-status-url="{{ route('library.availability-status') }}">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-sm font-semibold">YouTube availability audit</h2>
+                        <p class="mt-1 text-xs text-zinc-500" data-audit-state>{{ ucfirst($availabilityAudit['status']) }}</p>
+                    </div>
+                    <div class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-zinc-400">
+                        <span><strong class="text-zinc-100" data-audit-progress>{{ $availabilityAudit['processed'] }} / {{ $availabilityAudit['total'] }}</strong> checked</span>
+                        <span><strong class="text-emerald-300" data-audit-available>{{ $availabilityAudit['available'] }}</strong> available</span>
+                        <span><strong class="text-amber-300" data-audit-unavailable>{{ $availabilityAudit['unavailable'] }}</strong> unavailable</span>
+                        <span><strong class="text-zinc-300" data-audit-unknown>{{ $availabilityAudit['unknown'] }}</strong> inconclusive</span>
+                    </div>
+                </div>
+                <div class="mt-3 h-1 overflow-hidden rounded bg-zinc-800"><div class="h-full bg-cyan-400 transition-[width]" data-audit-bar style="width: {{ $availabilityAudit['total'] > 0 ? min(100, ($availabilityAudit['processed'] / $availabilityAudit['total']) * 100) : 0 }}%"></div></div>
+            </section>
+        @endif
+
         <x-media-filters :clear-url="route('library')" />
 
         @if($media->isEmpty())

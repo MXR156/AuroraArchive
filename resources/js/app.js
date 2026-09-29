@@ -58,3 +58,19 @@ document.querySelectorAll('[data-bulk-media-form]').forEach((form) => {
         }
     });
 });
+document.querySelectorAll('[data-availability-audit]').forEach((panel) => {
+    const refresh = async () => {
+        const response = await fetch(panel.dataset.statusUrl, { headers: { Accept: 'application/json' } });
+        if (!response.ok) return;
+        const audit = await response.json();
+        if (!audit) return;
+        panel.querySelector('[data-audit-state]').textContent = audit.status.charAt(0).toUpperCase() + audit.status.slice(1);
+        panel.querySelector('[data-audit-progress]').textContent = `${audit.processed} / ${audit.total}`;
+        panel.querySelector('[data-audit-available]').textContent = audit.available;
+        panel.querySelector('[data-audit-unavailable]').textContent = audit.unavailable;
+        panel.querySelector('[data-audit-unknown]').textContent = audit.unknown;
+        panel.querySelector('[data-audit-bar]').style.width = `${audit.total > 0 ? Math.min(100, audit.processed / audit.total * 100) : 0}%`;
+        if (audit.status !== 'completed') window.setTimeout(refresh, 3000);
+    };
+    if (panel.querySelector('[data-audit-state]').textContent.trim().toLowerCase() !== 'completed') window.setTimeout(refresh, 1000);
+});
