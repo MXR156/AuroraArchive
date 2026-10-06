@@ -9,5 +9,6 @@ return [
     'yt_dlp_pot_provider_url' => env('YT_DLP_POT_PROVIDER_URL'),
     'deno' => env('DENO_BINARY', 'deno'),
     'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
+    'ffprobe' => env('FFPROBE_BINARY', 'ffprobe'),
     'temp_root' => env('AURORAARCHIVE_TEMP_ROOT', storage_path('app/tmp')),
 ];

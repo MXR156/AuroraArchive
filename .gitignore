@@ -24,6 +24,7 @@
 /media
 /persistent-config
 cookies.txt
+database/yt_strings*.txt
 *.part
 _ide_helper.php
 Homestead.json

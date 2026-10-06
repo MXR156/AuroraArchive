@@ -16,6 +16,23 @@ use Throwable;
 
 class YtDlpService implements YoutubeDownloader
 {
+    /** @return array<string, mixed>|null */
+    public function metadataForRecovery(string $youtubeId, ?int $userId = null): ?array
+    {
+        $result = $this->run([
+            '--dump-single-json', '--no-playlist', '--skip-download', '--no-warnings',
+            'https://www.youtube.com/watch?v='.$youtubeId,
+        ], $this->cookiesFor($userId), 90, true);
+
+        if ($result['exit_code'] !== 0) {
+            return null;
+        }
+
+        $metadata = json_decode($result['stdout'], true);
+
+        return is_array($metadata) ? $metadata : null;
+    }
+
     public function discover(Source $source): array
     {
         $arguments = $source->type === 'video'
