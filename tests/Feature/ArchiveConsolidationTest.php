@@ -63,11 +63,20 @@ test('dry runs create no media files or database attachments', function () {
     File::put($this->source.'/video/Recovered Channel/video [ABCDEFGHIJK].mp4', 'archive');
     Media::query()->create(['youtube_id' => 'ABCDEFGHIJK', 'title' => 'Video', 'original_url' => 'https://www.youtube.com/watch?v=ABCDEFGHIJK']);
 
-    $stats = app(ArchiveConsolidation::class)->consolidate($this->source, $this->destination);
+    $messages = [];
+    $stats = app(ArchiveConsolidation::class)->consolidate(
+        $this->source,
+        $this->destination,
+        report: function (string $message) use (&$messages): void {
+            $messages[] = $message;
+        },
+    );
 
     expect($stats)->toMatchArray(['planned' => 1, 'copied' => 0, 'files_attached' => 0])
         ->and(File::allFiles($this->destination))->toBeEmpty()
-        ->and(Media::query()->firstOrFail()->files)->toBeEmpty();
+        ->and(Media::query()->firstOrFail()->files)->toBeEmpty()
+        ->and($messages)->toHaveCount(1)
+        ->and($messages[0])->toStartWith('PLANNED:');
 });
 
 test('it never overwrites a conflicting destination file', function () {

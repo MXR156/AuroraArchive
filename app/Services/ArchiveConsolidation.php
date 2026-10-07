@@ -43,7 +43,9 @@ class ArchiveConsolidation
             $candidate = $this->candidate($file, $sourceRoot);
             if ($candidate['youtube_id'] === null) {
                 $stats['unrecognised']++;
-                $report?->call($this, 'Unrecognised: '.$candidate['relative_path']);
+                if ($report !== null) {
+                    $report('Unrecognised: '.$candidate['relative_path']);
+                }
 
                 continue;
             }
@@ -110,7 +112,9 @@ class ArchiveConsolidation
             }
 
             $manifest[] = $entry;
-            $report?->call($this, Str::upper($entry['result']).": {$entry['source']} -> {$entry['destination']}");
+            if ($report !== null) {
+                $report(Str::upper($entry['result']).": {$entry['source']} -> {$entry['destination']}");
+            }
         }
 
         if ($manifestPath !== null) {
