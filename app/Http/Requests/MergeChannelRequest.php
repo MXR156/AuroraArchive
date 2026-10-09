@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class UpdateMediaRequest extends FormRequest
+class MergeChannelRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -15,10 +15,7 @@ class UpdateMediaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'channel_name' => ['nullable', 'string', 'max:255'],
-            'channel_id' => ['nullable', 'string', 'max:255'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string', 'max:100000'],
+            'target_channel' => ['required', 'string', 'max:1000'],
         ];
     }
 }

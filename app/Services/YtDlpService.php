@@ -373,10 +373,29 @@ class YtDlpService implements YoutubeDownloader
     /** @param array{exit_code:int,stdout:string,stderr:string} $result */
     private function requiresUnauthenticatedRetry(array $result): bool
     {
-        return $result['exit_code'] !== 0
-            && Str::contains(Str::lower($result['stderr']), [
-                'playback on other websites has been disabled',
-                'embedding disabled',
+        if ($result['exit_code'] === 0) {
+            return false;
+        }
+
+        $error = Str::lower($result['stderr']);
+        if (Str::contains($error, [
+            'playback on other websites has been disabled',
+            'embedding disabled',
+        ])) {
+            return true;
+        }
+
+        return Str::contains($error, 'video unavailable')
+            && ! Str::contains($error, [
+                'private video',
+                'this video has been removed',
+                'video has been removed',
+                'removed by the uploader',
+                'removed for violating',
+                'is no longer available',
+                'account associated with this video has been terminated',
+                'age-restricted',
+                'confirm your age',
             ]);
     }
 

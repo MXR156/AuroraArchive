@@ -54,6 +54,7 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
         $manualTitle = (bool) Arr::get($metadata, 'manual.title');
         $manualDescription = (bool) Arr::get($metadata, 'manual.description');
         $manualChannelName = (bool) Arr::get($metadata, 'manual.channel_name');
+        $manualChannelId = (bool) Arr::get($metadata, 'manual.channel_id');
 
         Arr::set($metadata, 'youtube.archive_snapshot', Arr::only($remote, [
             'title', 'description', 'channel', 'channel_id', 'channel_url', 'uploader', 'uploader_id',
@@ -90,7 +91,7 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
             'title' => ! $manualTitle && filled(Arr::get($remote, 'title')) ? Arr::get($remote, 'title') : $this->media->title,
             'description' => ! $manualDescription && filled(Arr::get($remote, 'description')) ? Arr::get($remote, 'description') : $this->media->description,
             'channel_name' => ! $manualChannelName && filled($channelName) ? $channelName : $this->media->channel_name,
-            'channel_id' => filled($channelId) ? $channelId : $this->media->channel_id,
+            'channel_id' => ! $manualChannelId && filled($channelId) ? $channelId : $this->media->channel_id,
             'published_at' => $publishedAt ?? $this->media->published_at,
             'duration_seconds' => filled(Arr::get($remote, 'duration')) ? (int) Arr::get($remote, 'duration') : $this->media->duration_seconds,
             'thumbnail_url' => filled(Arr::get($remote, 'thumbnail')) ? Arr::get($remote, 'thumbnail') : $this->media->getRawOriginal('thumbnail_url'),

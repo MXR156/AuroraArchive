@@ -78,7 +78,7 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
             'title' => Arr::get($metadata, 'manual.title') || blank(Arr::get($downloadMetadata, 'title')) ? $this->media->title : (string) Arr::get($downloadMetadata, 'title'),
             'description' => Arr::get($metadata, 'manual.description') || blank(Arr::get($downloadMetadata, 'description')) ? $this->media->description : (string) Arr::get($downloadMetadata, 'description'),
             'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $this->media->channel_name : (Arr::get($downloadMetadata, 'channel') ?: Arr::get($downloadMetadata, 'uploader') ?: $this->media->channel_name),
-            'channel_id' => Arr::get($downloadMetadata, 'channel_id') ?: Arr::get($downloadMetadata, 'uploader_id') ?: $this->media->channel_id,
+            'channel_id' => Arr::get($metadata, 'manual.channel_id') ? $this->media->channel_id : (Arr::get($downloadMetadata, 'channel_id') ?: Arr::get($downloadMetadata, 'uploader_id') ?: $this->media->channel_id),
             'published_at' => filled(Arr::get($downloadMetadata, 'timestamp')) ? now()->setTimestamp((int) Arr::get($downloadMetadata, 'timestamp')) : $this->media->published_at,
             'duration_seconds' => Arr::get($downloadMetadata, 'duration') ?: $this->media->duration_seconds,
             'status' => MediaStatus::Downloaded,

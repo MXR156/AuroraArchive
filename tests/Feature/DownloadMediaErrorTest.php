@@ -49,7 +49,10 @@ it('only retries playback restrictions without authentication', function (string
 })->with([
     ['Playback on other websites has been disabled by the video owner', true],
     ['Embedding disabled', true],
+    ['ERROR: [youtube] AAAAAAAAAAA: Video unavailable', true],
     ['This video is private', false],
+    ['Video unavailable. This video has been removed by the uploader', false],
+    ['Video unavailable. The account associated with this video has been terminated', false],
     ['Sign in to confirm your age', false],
 ]);
 

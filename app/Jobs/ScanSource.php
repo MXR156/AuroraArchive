@@ -72,7 +72,7 @@ class ScanSource implements ShouldBeUnique, ShouldQueue
                 'title' => Arr::get($metadata, 'manual.title') ? $medium->title : ($hasArchivedFile ? $this->preservedTitle($medium->title, Arr::get($entry, 'title'), $youtubeId) : (filled(Arr::get($entry, 'title')) ? (string) Arr::get($entry, 'title') : ($medium->title ?: $youtubeId))),
                 'description' => Arr::get($metadata, 'manual.description') ? $medium->description : ($hasArchivedFile ? ($medium->description ?: Arr::get($entry, 'description')) : (Arr::get($entry, 'description') ?: $medium->description)),
                 'channel_name' => Arr::get($metadata, 'manual.channel_name') ? $medium->channel_name : ($hasArchivedFile ? $this->preservedChannelName($medium->channel_name, Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader')) : (Arr::get($entry, 'channel') ?: Arr::get($entry, 'uploader') ?: $medium->channel_name)),
-                'channel_id' => $medium->channel_id ?: Arr::get($entry, 'channel_id'),
+                'channel_id' => Arr::get($metadata, 'manual.channel_id') ? $medium->channel_id : ($medium->channel_id ?: Arr::get($entry, 'channel_id')),
                 'published_at' => $medium->published_at ?: (filled(Arr::get($entry, 'timestamp')) ? now()->setTimestamp((int) Arr::get($entry, 'timestamp')) : null),
                 'duration_seconds' => $medium->duration_seconds ?: Arr::get($entry, 'duration'),
                 'thumbnail_url' => $medium->getRawOriginal('thumbnail_url') ?: Arr::get($entry, 'thumbnail'),

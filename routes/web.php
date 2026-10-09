@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/playlists/{playlist}', [PlaylistController::class, 'destroy'])->name('playlists.destroy');
     Route::get('/channels', [ChannelController::class, 'index'])->name('channels.index');
     Route::get('/channels/{channel}', [ChannelController::class, 'show'])->name('channels.show');
+    Route::post('/channels/{channel}/merge', [ChannelController::class, 'merge'])->name('channels.merge');
     Route::get('/downloads', fn () => redirect()->route('library', ['filter' => 'active_downloads']))->name('downloads');
     Route::get('/watch/{medium}', [MediaController::class, 'show'])->name('media.show');
     Route::get('/media/{medium}/edit', [MediaController::class, 'edit'])->name('media.edit');

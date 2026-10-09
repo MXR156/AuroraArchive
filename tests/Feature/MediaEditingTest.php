@@ -13,6 +13,7 @@ test('an authenticated user can edit video channel name title and description', 
         'title' => 'Imported title',
         'description' => 'Imported description',
         'channel_name' => 'Unavailable channel',
+        'channel_id' => 'UC-WRONG',
         'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
         'metadata' => ['tubesync' => ['preserved' => true]],
     ]);
@@ -20,6 +21,7 @@ test('an authenticated user can edit video channel name title and description', 
     $this->actingAs($user)
         ->put(route('media.update', $medium), [
             'channel_name' => 'Archived creator',
+            'channel_id' => '',
             'title' => 'Corrected title',
             'description' => 'Corrected description',
         ])
@@ -28,9 +30,11 @@ test('an authenticated user can edit video channel name title and description', 
 
     $medium->refresh();
     expect($medium->channel_name)->toBe('Archived creator')
+        ->and($medium->channel_id)->toBeNull()
         ->and($medium->title)->toBe('Corrected title')
         ->and($medium->description)->toBe('Corrected description')
         ->and(data_get($medium->metadata, 'manual.channel_name'))->toBeTrue()
+        ->and(data_get($medium->metadata, 'manual.channel_id'))->toBeTrue()
         ->and(data_get($medium->metadata, 'manual.title'))->toBeTrue()
         ->and(data_get($medium->metadata, 'manual.description'))->toBeTrue()
         ->and(data_get($medium->metadata, 'tubesync.preserved'))->toBeTrue();

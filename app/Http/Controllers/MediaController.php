@@ -156,6 +156,9 @@ class MediaController extends Controller
     {
         $metadata = $medium->metadata ?? [];
         Arr::set($metadata, 'manual.channel_name', true);
+        if ($request->has('channel_id')) {
+            Arr::set($metadata, 'manual.channel_id', true);
+        }
         Arr::set($metadata, 'manual.title', true);
         Arr::set($metadata, 'manual.description', true);
         Arr::set($metadata, 'manual.edited_at', now()->toIso8601String());

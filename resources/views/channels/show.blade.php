@@ -11,6 +11,22 @@
             @endif
         </header>
 
+        <form method="POST" action="{{ route('channels.merge', $representative->archiveChannelKey()) }}" class="flex max-w-2xl flex-wrap items-end gap-2" onsubmit="return confirm('ARE YOU SURE? Every video in this archive channel will be assigned to the selected channel.');">
+            @csrf
+            <label class="grid min-w-64 flex-1 gap-2 text-sm font-medium">
+                Merge into
+                <select name="target_channel" required class="field">
+                    <option value="">Choose archive channel</option>
+                    @foreach($channelOptions as $channelOption)
+                        @if($channelOption->archiveChannelKey() !== $representative->archiveChannelKey())
+                            <option value="{{ $channelOption->archiveChannelKey() }}">{{ $channelOption->channel_name }} ({{ number_format($channelOption->media_count) }})</option>
+                        @endif
+                    @endforeach
+                </select>
+            </label>
+            <button class="secondary">Merge channel</button>
+        </form>
+
         <x-media-filters :clear-url="route('channels.show', $representative->archiveChannelKey())" />
 
         @if($media->isEmpty())
