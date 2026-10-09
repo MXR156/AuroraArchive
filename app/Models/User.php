@@ -47,6 +47,11 @@ class User extends Authenticatable
         return $this->hasOne(YoutubeCredential::class);
     }
 
+    public function filmotCredential(): HasOne
+    {
+        return $this->hasOne(FilmotCredential::class);
+    }
+
     public function watchHistory(): HasMany
     {
         return $this->hasMany(WatchHistory::class);

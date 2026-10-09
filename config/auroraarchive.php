@@ -10,5 +10,6 @@ return [
     'deno' => env('DENO_BINARY', 'deno'),
     'ffmpeg' => env('FFMPEG_BINARY', 'ffmpeg'),
     'ffprobe' => env('FFPROBE_BINARY', 'ffprobe'),
+    'filmot_api_host' => env('FILMOT_API_HOST', 'filmot-tube-metadata-archive.p.rapidapi.com'),
     'temp_root' => env('AURORAARCHIVE_TEMP_ROOT', storage_path('app/tmp')),
 ];

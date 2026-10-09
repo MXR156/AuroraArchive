@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\YoutubeDownloader;
+use App\Http\Requests\StoreFilmotCredentialRequest;
+use App\Models\FilmotCredential;
 use App\Models\YoutubeCredential;
 use App\Services\YtDlpReleaseVersions;
 use Illuminate\Http\RedirectResponse;
@@ -17,9 +19,26 @@ class SettingsController extends Controller
     {
         return view('settings', [
             'credential' => YoutubeCredential::query()->whereBelongsTo($request->user())->first(),
+            'filmotCredential' => FilmotCredential::query()->whereBelongsTo($request->user())->first(),
             'ytDlpVersion' => $youtube->version(),
             'ytDlpReleaseVersions' => $releaseVersions->get(),
         ]);
+    }
+
+    public function storeFilmotCredential(StoreFilmotCredentialRequest $request): RedirectResponse
+    {
+        $request->user()->filmotCredential()->updateOrCreate([], [
+            'api_key' => $request->validated('api_key'),
+        ]);
+
+        return back()->with('success', 'Filmot RapidAPI key encrypted and stored.');
+    }
+
+    public function destroyFilmotCredential(Request $request): RedirectResponse
+    {
+        FilmotCredential::query()->whereBelongsTo($request->user())->delete();
+
+        return back()->with('success', 'Filmot RapidAPI key removed.');
     }
 
     public function store(Request $request): RedirectResponse

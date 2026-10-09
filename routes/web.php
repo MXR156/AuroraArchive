@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChannelController;
+use App\Http\Controllers\FilmotController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LibraryController;
 use App\Http\Controllers\MediaController;
@@ -47,6 +48,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/media/{medium}/stream', [MediaController::class, 'stream'])->name('media.stream');
     Route::get('/media/{medium}/thumbnail', [MediaController::class, 'thumbnail'])->name('media.thumbnail');
     Route::post('/media/{medium}/thumbnail/refresh', [MediaController::class, 'refreshThumbnail'])->name('media.thumbnail.refresh');
+    Route::post('/media/{medium}/filmot', [FilmotController::class, 'lookup'])->name('media.filmot.lookup');
+    Route::post('/media/{medium}/metadata/preview', [FilmotController::class, 'previewPasted'])->name('media.metadata.preview');
+    Route::post('/media/{medium}/filmot/apply', [FilmotController::class, 'apply'])->name('media.filmot.apply');
     Route::post('/media/{medium}/download', [MediaController::class, 'queue'])->name('media.queue');
     Route::delete('/media/{medium}', [MediaController::class, 'destroy'])->name('media.destroy');
     Route::put('/media/{medium}/progress', [MediaController::class, 'progress'])->name('media.progress');
@@ -55,6 +59,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/cookies/test', [SettingsController::class, 'test'])->name('settings.cookies.test');
     Route::delete('/settings/cookies', [SettingsController::class, 'destroy'])->name('settings.cookies.destroy');
     Route::post('/settings/yt-dlp/update', [SettingsController::class, 'updateDownloader'])->name('settings.yt-dlp.update');
+    Route::put('/settings/filmot', [SettingsController::class, 'storeFilmotCredential'])->name('settings.filmot.store');
+    Route::delete('/settings/filmot', [SettingsController::class, 'destroyFilmotCredential'])->name('settings.filmot.destroy');
     Route::get('/imports/tubesync', [TubeSyncImportController::class, 'index'])->name('imports.tubesync');
     Route::post('/imports/tubesync', [TubeSyncImportController::class, 'store'])->name('imports.tubesync.store');
     Route::get('/system-health', SystemHealthController::class)->name('system-health');

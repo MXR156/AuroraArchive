@@ -56,6 +56,12 @@
                         @csrf
                         <button class="secondary">Refresh from YouTube</button>
                     </form>
+                    @if($filmotConfigured)
+                        <form method="POST" action="{{ route('media.filmot.lookup', $medium) }}">
+                            @csrf
+                            <button class="secondary">Check Filmot</button>
+                        </form>
+                    @endif
                     @if($next)
                         <a href="{{ $nextUrl }}" class="secondary">Next video</a>
                     @endif
@@ -75,6 +81,52 @@
                     {{ data_get($medium->metadata, 'youtube.metadata_refresh_status') === 'updated' ? 'updated' : 'no metadata returned' }}
                     &middot; {{ \Illuminate\Support\Carbon::parse(data_get($medium->metadata, 'youtube.metadata_refreshed_at'))->diffForHumans() }}
                 </p>
+            @endif
+            <details class="mt-8 border-t border-white/10 pt-5">
+                <summary class="cursor-pointer text-sm font-semibold text-zinc-200">Paste archived metadata JSON</summary>
+                <form method="POST" action="{{ route('media.metadata.preview', $medium) }}" class="mt-4 grid gap-3">
+                    @csrf
+                    <textarea name="metadata_json" rows="10" required class="field resize-y font-mono text-xs" placeholder='{"id":"{{ $medium->youtube_id }}","title":"Archived title","description":"Line one\n\nLine two","channelname":"Channel name"}'>{{ old('metadata_json') }}</textarea>
+                    <button class="secondary w-fit">Convert and preview</button>
+                </form>
+            </details>
+            @if(is_array($filmotPreview))
+                @php
+                    $filmotFields = [
+                        'title' => 'Title',
+                        'description' => 'Description',
+                        'channel_name' => 'Channel name',
+                        'channel_id' => 'Channel ID',
+                        'published_at' => 'Published date',
+                        'duration_seconds' => 'Duration',
+                        'thumbnail_url' => 'Thumbnail URL',
+                    ];
+                @endphp
+                <section class="mt-8 border-t border-white/10 pt-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="font-semibold">Recovered metadata preview</h2>
+                            <p class="mt-1 text-sm text-zinc-500">Select the fields to replace. Unselected archive metadata remains unchanged.</p>
+                        </div>
+                        <span class="badge">{{ $filmotPreview['youtube_id'] ?? '' }}</span>
+                    </div>
+
+                    <form method="POST" action="{{ route('media.filmot.apply', $medium) }}" class="mt-4 grid gap-3">
+                        @csrf
+                        @foreach($filmotFields as $field => $label)
+                            @if(filled($filmotPreview[$field] ?? null))
+                                <label class="grid cursor-pointer grid-cols-[1.25rem_minmax(0,1fr)] gap-3 border-b border-white/8 py-3 last:border-b-0 sm:grid-cols-[1.25rem_9rem_minmax(0,1fr)]">
+                                    <input type="checkbox" name="fields[]" value="{{ $field }}" checked class="mt-1 size-4 accent-cyan-500">
+                                    <span class="text-sm font-medium text-zinc-300">{{ $label }}</span>
+                                    <span class="min-w-0 break-words text-sm text-zinc-400">
+                                        {{ $field === 'description' ? \Illuminate\Support\Str::limit($filmotPreview[$field], 500) : $filmotPreview[$field] }}
+                                    </span>
+                                </label>
+                            @endif
+                        @endforeach
+                        <button class="primary mt-2 w-fit">Import selected fields</button>
+                    </form>
+                </section>
             @endif
             @if($medium->description)
                 <div class="mt-6 whitespace-pre-line rounded-2xl bg-zinc-900 p-5 text-sm leading-6 text-zinc-300">{{ $medium->description }}</div>

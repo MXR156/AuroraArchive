@@ -49,12 +49,14 @@ class MediaController extends Controller
         $playlistName = $playlist?->name ?? $localPlaylist?->name;
         $playlistUrl = $playlist !== null ? route('sources.show', $playlist) : ($localPlaylist !== null ? route('playlists.show', $localPlaylist) : null);
         $playlists = $request->user()->playlists()->orderBy('name')->get();
+        $filmotConfigured = $request->user()->filmotCredential()->exists();
+        $filmotPreview = $request->session()->get('filmot_previews.'.$medium->id);
         $nextUrl = $next === null ? null : route('media.show', [
             'medium' => $next,
             ...($playlist !== null ? ['playlist' => $playlist] : ['local_playlist' => $localPlaylist]),
         ]);
 
-        return view('media.show', compact('medium', 'related', 'next', 'playlistName', 'playlistUrl', 'playlists', 'nextUrl'));
+        return view('media.show', compact('medium', 'related', 'next', 'playlistName', 'playlistUrl', 'playlists', 'nextUrl', 'filmotConfigured', 'filmotPreview'));
     }
 
     public function queue(Media $medium): RedirectResponse

@@ -39,6 +39,34 @@
         </section>
 
         <section class="rounded-2xl border border-white/10 bg-zinc-900 p-6">
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="font-semibold">Filmot metadata recovery</h2>
+                    <p class="mt-1 text-sm text-zinc-500">Use Filmot's documented RapidAPI endpoint to recover metadata for individual videos.</p>
+                </div>
+                <span class="badge">{{ $filmotCredential ? 'configured' : 'not configured' }}</span>
+            </div>
+
+            <form method="POST" action="{{ route('settings.filmot.store') }}" class="grid gap-4 border-t border-white/8 pt-6">
+                @csrf
+                @method('PUT')
+                <label class="grid gap-2">
+                    <span class="text-sm font-medium text-zinc-300">RapidAPI key</span>
+                    <input type="password" name="api_key" required autocomplete="off" class="field" placeholder="Enter a new key">
+                </label>
+                <button class="primary w-fit">Encrypt and save</button>
+            </form>
+
+            @if($filmotCredential)
+                <form method="POST" action="{{ route('settings.filmot.destroy') }}" class="mt-6 border-t border-white/8 pt-6">
+                    @csrf
+                    @method('DELETE')
+                    <button class="danger">Remove Filmot key</button>
+                </form>
+            @endif
+        </section>
+
+        <section class="rounded-2xl border border-white/10 bg-zinc-900 p-6">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h2 class="font-semibold">TubeSync import</h2>
