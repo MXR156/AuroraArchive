@@ -54,7 +54,7 @@
                     <a href="{{ route('media.edit', $medium) }}" class="secondary">Edit metadata</a>
                     <form method="POST" action="{{ route('media.thumbnail.refresh', $medium) }}">
                         @csrf
-                        <button class="secondary">Check thumbnail</button>
+                        <button class="secondary">Refresh from YouTube</button>
                     </form>
                     @if($next)
                         <a href="{{ $nextUrl }}" class="secondary">Next video</a>

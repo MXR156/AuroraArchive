@@ -69,9 +69,9 @@ class MediaController extends Controller
 
     public function refreshThumbnail(Media $medium): RedirectResponse
     {
-        RefreshMediaThumbnail::dispatch($medium);
+        RefreshMediaThumbnail::dispatch($medium, auth()->id());
 
-        return back()->with('success', 'YouTube thumbnail check queued. Refresh this page shortly to see the result.');
+        return back()->with('success', 'YouTube metadata and thumbnail refresh queued. Refresh this page shortly to see the result.');
     }
 
     public function bulkRetry(BulkRetryMediaRequest $request): RedirectResponse
