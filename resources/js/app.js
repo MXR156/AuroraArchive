@@ -5,7 +5,14 @@ document.querySelectorAll('[data-media-filters] select').forEach((select) => {
 });
 document.querySelectorAll('.media-player').forEach((player) => {
     const resumeAt = Number(player.dataset.resume || 0);
-    player.addEventListener('loadedmetadata', () => { if (resumeAt > 0 && resumeAt < player.duration - 10) player.currentTime = resumeAt; }, { once: true });
+    const resume = () => {
+        const seek = () => {
+            if (resumeAt > 0 && resumeAt < player.duration - 10) player.currentTime = resumeAt;
+        };
+        if (player.readyState >= HTMLMediaElement.HAVE_METADATA) seek();
+        else player.addEventListener('loadedmetadata', seek, { once: true });
+    };
+    player.addEventListener('play', resume, { once: true });
     let lastSaved = 0;
     const save = () => {
         if (!csrfToken || Math.abs(player.currentTime-lastSaved)<10) return;
