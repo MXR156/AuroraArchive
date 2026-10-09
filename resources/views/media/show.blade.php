@@ -69,6 +69,13 @@
                     </form>
                 </div>
             </div>
+            @if(data_get($medium->metadata, 'youtube.metadata_refreshed_at'))
+                <p class="mt-2 text-xs text-zinc-500">
+                    YouTube metadata refresh:
+                    {{ data_get($medium->metadata, 'youtube.metadata_refresh_status') === 'updated' ? 'updated' : 'no metadata returned' }}
+                    &middot; {{ \Illuminate\Support\Carbon::parse(data_get($medium->metadata, 'youtube.metadata_refreshed_at'))->diffForHumans() }}
+                </p>
+            @endif
             @if($medium->description)
                 <div class="mt-6 whitespace-pre-line rounded-2xl bg-zinc-900 p-5 text-sm leading-6 text-zinc-300">{{ $medium->description }}</div>
             @endif

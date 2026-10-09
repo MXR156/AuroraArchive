@@ -85,6 +85,25 @@ test('the youtube refresh updates metadata and the published thumbnail', functio
         ->and($medium->getRawOriginal('thumbnail_url'))->toBe('https://i.ytimg.com/vi/AAAAAAAAAAA/maxresdefault.jpg')
         ->and(data_get($medium->metadata, 'youtube.archive_snapshot.title'))->toBe('Current YouTube title')
         ->and(data_get($medium->metadata, 'channel_url'))->toBe('https://www.youtube.com/channel/UC-CURRENT')
+        ->and(data_get($medium->metadata, 'youtube.metadata_refresh_status'))->toBe('updated')
+        ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('available')
+        ->and(data_get($medium->metadata, 'youtube.metadata_refreshed_at'))->not->toBeNull();
+});
+
+test('the youtube refresh records when no metadata was returned', function () {
+    $medium = Media::query()->create([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'title' => 'Recovered title',
+        'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
+    ]);
+    $youtube = Mockery::mock(YtDlpService::class);
+    $youtube->shouldReceive('metadataForRecovery')->once()->andReturnNull();
+    $thumbnail = Mockery::mock(MediaThumbnail::class);
+    $thumbnail->shouldReceive('refreshFromYoutube')->once()->andReturnFalse();
+
+    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail);
+
+    expect(data_get($medium->refresh()->metadata, 'youtube.metadata_refresh_status'))->toBe('no_metadata')
         ->and(data_get($medium->metadata, 'youtube.metadata_refreshed_at'))->not->toBeNull();
 });
 

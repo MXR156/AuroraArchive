@@ -20,9 +20,9 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
 
     public array $backoff = [30, 120];
 
-    public int $timeout = 150;
+    public int $timeout = 420;
 
-    public int $uniqueFor = 300;
+    public int $uniqueFor = 600;
 
     public function __construct(public Media $media, public ?int $userId = null)
     {
@@ -39,6 +39,8 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
         $remote = $youtube->metadataForRecovery($this->media->youtube_id, $this->userId);
         if ($remote !== null) {
             $this->updateMetadata($remote);
+        } else {
+            $this->recordFailedMetadataRefresh();
         }
 
         $thumbnail->refreshFromYoutube($this->media);
@@ -58,6 +60,21 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
             'uploader_url', 'timestamp', 'upload_date', 'duration', 'thumbnail', 'availability',
         ]));
         Arr::set($metadata, 'youtube.metadata_refreshed_at', now()->toIso8601String());
+        Arr::set($metadata, 'youtube.metadata_refresh_status', 'updated');
+        Arr::set($metadata, 'youtube.availability_checked_at', now()->toIso8601String());
+        Arr::set($metadata, 'youtube.availability_check_status', 'available');
+        Arr::set($metadata, 'youtube.availability_check_reason', null);
+        Arr::set($metadata, 'youtube.availability_check_evidence.metadata_refresh', [
+            'status' => 'available',
+            'reason' => null,
+        ]);
+        Arr::set($metadata, 'youtube.availability_checked_at', now()->toIso8601String());
+        Arr::set($metadata, 'youtube.availability_check_status', 'available');
+        Arr::set($metadata, 'youtube.availability_check_reason', null);
+        Arr::set($metadata, 'youtube.availability_check_evidence.metadata_refresh', [
+            'status' => 'available',
+            'reason' => null,
+        ]);
 
         foreach (['channel_url', 'uploader_url'] as $key) {
             if (filled(Arr::get($remote, $key))) {
@@ -80,6 +97,15 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
             'original_url' => $this->media->youtubeVideoUrl(),
             'metadata' => $metadata,
         ]);
+    }
+
+    private function recordFailedMetadataRefresh(): void
+    {
+        $this->media->refresh();
+        $metadata = $this->media->metadata ?? [];
+        Arr::set($metadata, 'youtube.metadata_refreshed_at', now()->toIso8601String());
+        Arr::set($metadata, 'youtube.metadata_refresh_status', 'no_metadata');
+        $this->media->update(['metadata' => $metadata]);
     }
 
     /** @param array<string, mixed> $remote */

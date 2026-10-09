@@ -6,6 +6,7 @@ use App\Contracts\YoutubeDownloader;
 use App\Models\Media;
 use App\Models\Source;
 use App\Models\YoutubeCredential;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -19,18 +20,42 @@ class YtDlpService implements YoutubeDownloader
     /** @return array<string, mixed>|null */
     public function metadataForRecovery(string $youtubeId, ?int $userId = null): ?array
     {
-        $result = $this->run([
+        $arguments = [
             '--dump-single-json', '--no-playlist', '--skip-download', '--no-warnings',
             'https://www.youtube.com/watch?v='.$youtubeId,
-        ], $this->cookiesFor($userId), 90, true);
+        ];
+        $cookies = $this->cookiesFor($userId);
+        $result = $this->run($arguments, $cookies, 90, true);
 
-        if ($result['exit_code'] !== 0) {
-            return null;
+        if (filled($cookies) && $this->requiresPotClientFallback($result)) {
+            foreach ($this->potFallbackClients() as $client) {
+                $fallback = $this->run([
+                    '--extractor-args',
+                    "youtube:player_client={$client};fetch_pot=always",
+                    ...$arguments,
+                ], $cookies, 90, true);
+                if ($fallback['exit_code'] === 0) {
+                    $result = $fallback;
+                    break;
+                }
+            }
         }
 
-        $metadata = json_decode($result['stdout'], true);
+        if (filled($cookies) && $result['exit_code'] !== 0) {
+            $fallback = $this->run($arguments, null, 90, true);
+            if ($fallback['exit_code'] === 0) {
+                $result = $fallback;
+            }
+        }
 
-        return is_array($metadata) ? $metadata : null;
+        if ($result['exit_code'] === 0) {
+            $metadata = json_decode($result['stdout'], true);
+            if (is_array($metadata)) {
+                return $metadata;
+            }
+        }
+
+        return $this->webpageMetadata($youtubeId);
     }
 
     public function discover(Source $source): array
@@ -189,19 +214,7 @@ class YtDlpService implements YoutubeDownloader
     private function webpageAvailability(Media $media): array
     {
         try {
-            $response = Http::withHeaders([
-                'Accept-Language' => 'en-GB,en;q=0.9',
-                'User-Agent' => 'Mozilla/5.0 (compatible; AuroraArchive/1.0)',
-            ])->withCookie('CONSENT', 'YES+cb', '.youtube.com')
-                ->connectTimeout(5)
-                ->timeout(15)
-                ->retry([250, 1000], throw: false)
-                ->get('https://www.youtube.com/watch', [
-                    'v' => $media->youtube_id,
-                    'hl' => 'en',
-                    'has_verified' => '1',
-                    'bpctr' => '9999999999',
-                ]);
+            $response = $this->youtubeWatchPage($media->youtube_id);
             if (! $response->successful()) {
                 return ['status' => 'unknown', 'reason' => 'YouTube watch page returned HTTP '.$response->status().'.'];
             }
@@ -210,6 +223,72 @@ class YtDlpService implements YoutubeDownloader
         } catch (Throwable $exception) {
             return ['status' => 'unknown', 'reason' => Str::limit($this->sanitise($exception->getMessage()), 500, '')];
         }
+    }
+
+    private function youtubeWatchPage(string $youtubeId): Response
+    {
+        return Http::withHeaders([
+            'Accept-Language' => 'en-GB,en;q=0.9',
+            'User-Agent' => 'Mozilla/5.0 (compatible; AuroraArchive/1.0)',
+        ])->withCookies(['CONSENT' => 'YES+cb'], '.youtube.com')
+            ->connectTimeout(5)
+            ->timeout(15)
+            ->retry([250, 1000], throw: false)
+            ->get('https://www.youtube.com/watch', [
+                'v' => $youtubeId,
+                'hl' => 'en',
+                'has_verified' => '1',
+                'bpctr' => '9999999999',
+            ]);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function webpageMetadata(string $youtubeId): ?array
+    {
+        try {
+            $response = $this->youtubeWatchPage($youtubeId);
+            if (! $response->successful()) {
+                return null;
+            }
+
+            return $this->webpageMetadataResult($response->body());
+        } catch (Throwable $exception) {
+            return null;
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    private function webpageMetadataResult(string $html): ?array
+    {
+        $playerResponse = $this->jsonObjectAfter($html, 'ytInitialPlayerResponse');
+        if (! is_array($playerResponse) || Arr::get($playerResponse, 'playabilityStatus.status') !== 'OK') {
+            return null;
+        }
+
+        $details = Arr::get($playerResponse, 'videoDetails');
+        if (! is_array($details) || blank(Arr::get($details, 'title'))) {
+            return null;
+        }
+
+        $microformat = Arr::get($playerResponse, 'microformat.playerMicroformatRenderer', []);
+        $thumbnail = collect(Arr::get($details, 'thumbnail.thumbnails', []))->last();
+        $publishDate = Arr::get($microformat, 'publishDate') ?: Arr::get($microformat, 'uploadDate');
+
+        return [
+            'id' => Arr::get($details, 'videoId'),
+            'title' => Arr::get($details, 'title'),
+            'description' => Arr::get($details, 'shortDescription'),
+            'channel' => Arr::get($details, 'author'),
+            'channel_id' => Arr::get($details, 'channelId'),
+            'channel_url' => Arr::get($microformat, 'ownerProfileUrl'),
+            'uploader' => Arr::get($details, 'author'),
+            'uploader_id' => Arr::get($details, 'channelId'),
+            'uploader_url' => Arr::get($microformat, 'ownerProfileUrl'),
+            'upload_date' => is_string($publishDate) ? str_replace('-', '', $publishDate) : null,
+            'duration' => filled(Arr::get($details, 'lengthSeconds')) ? (int) Arr::get($details, 'lengthSeconds') : null,
+            'thumbnail' => is_array($thumbnail) ? Arr::get($thumbnail, 'url') : null,
+            'availability' => 'public',
+        ];
     }
 
     /** @return array{status:'available'|'unavailable'|'unknown',reason:?string} */

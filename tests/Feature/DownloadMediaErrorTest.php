@@ -7,6 +7,7 @@ use App\Models\Media;
 use App\Services\YtDlpService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 
 uses(LazilyRefreshDatabase::class);
 
@@ -87,6 +88,16 @@ it('does not infer removal when youtube omits its player status', function () {
     expect($method->invoke(app(YtDlpService::class), '<html>Consent required</html>')['status'])->toBe('unknown');
 });
 
+it('checks the youtube watch page with the supported cookie API', function () {
+    Http::fake([
+        'youtube.com/*' => Http::response('<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"AAAAAAAAAAA"}};</script>'),
+    ]);
+    $medium = new Media(['youtube_id' => 'AAAAAAAAAAA']);
+    $method = new ReflectionMethod(YtDlpService::class, 'webpageAvailability');
+
+    expect($method->invoke(app(YtDlpService::class), $medium)['status'])->toBe('available');
+});
+
 it('does not mark a video unavailable when another youtube probe confirms it is playable', function () {
     $method = new ReflectionMethod(YtDlpService::class, 'consolidateAvailability');
     $result = $method->invoke(app(YtDlpService::class), [
@@ -97,6 +108,31 @@ it('does not mark a video unavailable when another youtube probe confirms it is 
     expect($result['status'])->toBe('available')
         ->and($result['evidence']['yt_dlp']['status'])->toBe('unavailable')
         ->and($result['evidence']['watch_page']['status'])->toBe('available');
+});
+
+it('extracts recovery metadata from an available youtube watch page', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'webpageMetadataResult');
+    $html = '<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"AAAAAAAAAAA","title":"Watch page title","shortDescription":"Watch page description","author":"Watch page channel","channelId":"UC-WATCH","lengthSeconds":"123","thumbnail":{"thumbnails":[{"url":"https://example.test/small.jpg"},{"url":"https://example.test/large.jpg"}]}},"microformat":{"playerMicroformatRenderer":{"publishDate":"2024-01-02","ownerProfileUrl":"https://www.youtube.com/channel/UC-WATCH"}}};</script>';
+
+    $metadata = $method->invoke(app(YtDlpService::class), $html);
+
+    expect($metadata)->toMatchArray([
+        'title' => 'Watch page title',
+        'description' => 'Watch page description',
+        'channel' => 'Watch page channel',
+        'channel_id' => 'UC-WATCH',
+        'upload_date' => '20240102',
+        'duration' => 123,
+        'thumbnail' => 'https://example.test/large.jpg',
+        'availability' => 'public',
+    ]);
+});
+
+it('does not extract metadata from an unavailable youtube watch page', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'webpageMetadataResult');
+    $html = '<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"ERROR","reason":"Video unavailable"},"videoDetails":{"title":"Misleading title"}};</script>';
+
+    expect($method->invoke(app(YtDlpService::class), $html))->toBeNull();
 });
 
 it('stores the authoritative metadata snapshot when a download succeeds', function () {
