@@ -29,7 +29,12 @@ class ChannelController extends Controller
             ->orderBy('channel_name')
             ->paginate(48);
 
-        return view('channels.index', compact('channels'));
+        $representativeMedia = Media::query()
+            ->whereKey($channels->pluck('representative_media_id'))
+            ->get()
+            ->keyBy('id');
+
+        return view('channels.index', compact('channels', 'representativeMedia'));
     }
 
     public function show(Request $request, string $channel, ApplyMediaFilters $filters): View

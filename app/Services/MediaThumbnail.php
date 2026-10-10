@@ -376,12 +376,15 @@ class MediaThumbnail
     {
         $relativePath = 'Thumbs/'.$media->youtube_id.'.jpg';
         $metadata = $media->metadata ?? [];
+        $thumbnailVersion = hash_file('sha256', $this->canonicalPath($media));
         if (Arr::get($metadata, 'local_thumbnail_path') === $relativePath
+            && Arr::get($metadata, 'local_thumbnail_version') === $thumbnailVersion
             && $media->getRawOriginal('thumbnail_url') === route('media.thumbnail', $media, absolute: false)) {
             return;
         }
 
         Arr::set($metadata, 'local_thumbnail_path', $relativePath);
+        Arr::set($metadata, 'local_thumbnail_version', $thumbnailVersion);
         $media->update([
             'thumbnail_url' => route('media.thumbnail', $media, absolute: false),
             'metadata' => $metadata,

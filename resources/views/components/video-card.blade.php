@@ -6,7 +6,7 @@
         </label>
     @endif
     <a href="{{ $href ?: route('media.show', $medium) }}" class="relative block aspect-video overflow-hidden rounded-xl bg-zinc-900">
-        <img src="{{ route('media.thumbnail', $medium) }}" alt="" class="size-full object-cover transition group-hover:scale-[1.03]" loading="lazy">
+        <img src="{{ $medium->thumbnailRoute() }}" alt="" class="size-full object-cover transition group-hover:scale-[1.03]" loading="lazy">
         @if($medium->duration_seconds)
             <span class="absolute right-2 bottom-2 rounded bg-black/85 px-1.5 py-0.5 text-xs">{{ sprintf('%d:%02d', intdiv($medium->duration_seconds, 60), $medium->duration_seconds % 60) }}</span>
         @endif

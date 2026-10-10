@@ -25,7 +25,7 @@ function downloadedChannelMedia(string $youtubeId, string $channelName, ?string 
 test('the channels page groups archived media by creator', function () {
     $user = User::factory()->create();
     downloadedChannelMedia('AAAAAAAAAAA', 'Example Creator', 'UC123');
-    downloadedChannelMedia('BBBBBBBBBBB', 'Example Creator', 'UC123');
+    $representative = downloadedChannelMedia('BBBBBBBBBBB', 'Example Creator', 'UC123');
     Media::query()->create([
         'youtube_id' => 'CCCCCCCCCCC',
         'title' => 'Catalogue only',
@@ -39,7 +39,37 @@ test('the channels page groups archived media by creator', function () {
         ->assertSee('Example Creator')
         ->assertSee('2 videos')
         ->assertSee('Not Downloaded')
+        ->assertSee($representative->thumbnailRoute(), escape: false)
         ->assertSee(route('channels.show', 'id-UC123'), escape: false);
+});
+
+test('media routes use youtube ids and still resolve legacy database ids', function () {
+    $user = User::factory()->create();
+    $medium = downloadedChannelMedia('AAAAAAAAAAA', 'Example Creator', 'UC123');
+
+    expect(route('media.show', $medium))->toEndWith('/watch/AAAAAAAAAAA');
+
+    $this->actingAs($user)
+        ->get(route('media.show', $medium))
+        ->assertOk()
+        ->assertSee('Video AAAAAAAAAAA');
+
+    $this->actingAs($user)
+        ->get('/watch/'.$medium->id)
+        ->assertOk()
+        ->assertSee('Video AAAAAAAAAAA');
+});
+
+test('a numeric youtube id takes precedence over a legacy database id', function () {
+    $user = User::factory()->create();
+    downloadedChannelMedia('AAAAAAAAAAA', 'First Creator', 'UC123');
+    $numeric = downloadedChannelMedia('12345678901', 'Numeric Creator', 'UC456');
+
+    $this->actingAs($user)
+        ->get('/watch/12345678901')
+        ->assertOk()
+        ->assertSee($numeric->title)
+        ->assertDontSee('Video AAAAAAAAAAA');
 });
 
 test('downloaded video cards link creator names to the local channel page', function () {

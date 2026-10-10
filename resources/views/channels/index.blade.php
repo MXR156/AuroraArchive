@@ -10,10 +10,13 @@
         @else
             <div class="grid grid-cols-1 gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 @foreach($channels as $channel)
+                    @php($representative = $representativeMedia->get($channel->representative_media_id))
                     <article class="group min-w-0">
                         <a href="{{ route('channels.show', $channel->archiveChannelKey()) }}" class="block overflow-hidden rounded-lg bg-zinc-900">
                             <div class="aspect-video bg-zinc-900">
-                                <img src="{{ route('media.thumbnail', $channel->representative_media_id) }}" alt="" class="size-full object-cover transition group-hover:scale-[1.03]" loading="lazy">
+                                @if($representative)
+                                    <img src="{{ $representative->thumbnailRoute() }}" alt="" class="size-full object-cover transition group-hover:scale-[1.03]" loading="lazy">
+                                @endif
                             </div>
                         </a>
                         <div class="pt-3">

@@ -6,7 +6,7 @@
             @endif
             <div class="aspect-video overflow-hidden rounded-2xl bg-black">
                 @if($medium->files->isNotEmpty())
-                    <video class="media-player size-full" controls @if($playlistName) autoplay @endif preload="metadata" poster="{{ route('media.thumbnail', $medium) }}"
+                    <video class="media-player size-full" controls @if($playlistName) autoplay @endif preload="metadata" poster="{{ $medium->thumbnailRoute() }}"
                         data-progress-url="{{ route('media.progress', $medium) }}"
                         data-resume="{{ $medium->watchHistory->first()?->position_seconds ?? 0 }}"
                         @if($nextUrl) data-next-url="{{ $nextUrl }}" @endif>

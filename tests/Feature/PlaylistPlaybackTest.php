@@ -42,7 +42,7 @@ test('a user can open a playlist and see its media in position order', function 
 
     $response->assertOk()
         ->assertSeeInOrder(['First video', 'Second video'])
-        ->assertSee(route('media.thumbnail', $first), escape: false)
+        ->assertSee($first->thumbnailRoute(), escape: false)
         ->assertSee(route('media.show', ['medium' => $first, 'playlist' => $playlist]), escape: false);
 });
 
@@ -64,7 +64,7 @@ test('playlist playback exposes the next item and preserves playlist context', f
         ->assertSee('Archive Channel')
         ->assertSee('Original Video')
         ->assertSee('Original Channel')
-        ->assertSee('poster="'.route('media.thumbnail', $first).'"', escape: false)
+        ->assertSee('poster="'.$first->thumbnailRoute().'"', escape: false)
         ->assertSee(route('media.show', ['medium' => $second, 'playlist' => $playlist]), escape: false);
 });
 

@@ -29,6 +29,38 @@ class Media extends Model
         return Attribute::get(fn (?string $value): string => $value ?: 'https://i.ytimg.com/vi/'.$this->youtube_id.'/hqdefault.jpg');
     }
 
+    public function getRouteKeyName(): string
+    {
+        return 'youtube_id';
+    }
+
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        if ($field !== null) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        $media = static::query()->where('youtube_id', (string) $value)->first();
+        if ($media !== null) {
+            return $media;
+        }
+
+        return ctype_digit((string) $value)
+            ? static::query()->whereKey($value)->first()
+            : null;
+    }
+
+    public function thumbnailRoute(bool $absolute = true): string
+    {
+        $version = Arr::get($this->metadata, 'local_thumbnail_version')
+            ?? $this->updated_at?->getTimestamp();
+
+        return route('media.thumbnail', array_filter([
+            'medium' => $this,
+            'v' => $version,
+        ], fn (mixed $value): bool => filled($value)), $absolute);
+    }
+
     public function youtubeChannelUrl(): ?string
     {
         $sourceMetadata = collect(Arr::get($this->metadata ?? [], 'tubesync.sources', []));

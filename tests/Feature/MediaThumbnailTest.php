@@ -122,7 +122,9 @@ test('a youtube thumbnail refresh stores the published thumbnail with priority',
     expect($thumbnail->refreshFromYoutube($medium))->toBeTrue()
         ->and(realpath((string) $thumbnail->path($medium)))->toBe(realpath($root.'/Thumbs/AAAAAAAAAAA.jpg'))
         ->and($medium->refresh()->getRawOriginal('thumbnail_url'))->toBe(route('media.thumbnail', $medium, absolute: false))
-        ->and(data_get($medium->metadata, 'local_thumbnail_path'))->toBe('Thumbs/AAAAAAAAAAA.jpg');
+        ->and(data_get($medium->metadata, 'local_thumbnail_path'))->toBe('Thumbs/AAAAAAAAAAA.jpg')
+        ->and(data_get($medium->metadata, 'local_thumbnail_version'))->toBe(hash('sha256', $contents))
+        ->and($medium->thumbnailRoute())->toContain('/media/AAAAAAAAAAA/thumbnail?v='.hash('sha256', $contents));
 
     File::deleteDirectory($root);
 });
