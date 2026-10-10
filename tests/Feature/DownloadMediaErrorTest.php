@@ -4,6 +4,7 @@ use App\Contracts\YoutubeDownloader;
 use App\Enums\MediaStatus;
 use App\Jobs\DownloadMedia;
 use App\Models\Media;
+use App\Services\MediaThumbnail;
 use App\Services\YtDlpService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -36,7 +37,7 @@ it('reports disabled external playback separately from unavailable videos', func
         'version' => 'nightly',
     ]);
 
-    expect(fn () => (new DownloadMedia($medium))->handle($youtube))
+    expect(fn () => (new DownloadMedia($medium))->handle($youtube, Mockery::mock(MediaThumbnail::class)))
         ->toThrow(RuntimeException::class, 'Playback restricted');
     expect($medium->attempts()->firstOrFail()->error_category)->toBe('Playback restricted');
 });
@@ -167,7 +168,10 @@ it('stores the authoritative metadata snapshot when a download succeeds', functi
         ],
     ]);
 
-    (new DownloadMedia($medium))->handle($youtube);
+    $thumbnails = Mockery::mock(MediaThumbnail::class);
+    $thumbnails->shouldReceive('backfill')->once()->andReturn('local');
+
+    (new DownloadMedia($medium))->handle($youtube, $thumbnails);
 
     $medium->refresh();
     expect($medium->status)->toBe(MediaStatus::Downloaded)
@@ -198,7 +202,7 @@ it('reports age verification failures separately from unavailable videos', funct
         'version' => 'nightly',
     ]);
 
-    expect(fn () => (new DownloadMedia($medium))->handle($youtube))
+    expect(fn () => (new DownloadMedia($medium))->handle($youtube, Mockery::mock(MediaThumbnail::class)))
         ->toThrow(RuntimeException::class, 'Age verification / PO token required');
     expect($medium->attempts()->firstOrFail()->error_category)->toBe('Age verification / PO token required');
 });

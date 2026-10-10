@@ -14,6 +14,11 @@ class MediaThumbnail
 {
     public function path(Media $media): ?string
     {
+        $canonicalPath = $this->canonicalPath($media);
+        if (is_file($canonicalPath) && filesize($canonicalPath) > 0) {
+            return $canonicalPath;
+        }
+
         $youtubeThumbnailPath = $this->youtubeThumbnailPath($media);
         if (is_file($youtubeThumbnailPath) && $this->isUsableGeneratedThumbnail($youtubeThumbnailPath)) {
             return $youtubeThumbnailPath;
@@ -58,25 +63,32 @@ class MediaThumbnail
 
     public function refreshFromYoutube(Media $media): bool
     {
-        $cachePath = $this->youtubeThumbnailPath($media);
-        $this->removeGeneratedThumbnail($cachePath);
+        $destination = $this->canonicalPath($media, createDirectory: true);
 
         foreach (['maxresdefault', 'hqdefault'] as $variant) {
-            $response = Http::connectTimeout(5)
-                ->timeout(20)
-                ->retry(2, 250, throw: false)
-                ->get("https://i.ytimg.com/vi/{$media->youtube_id}/{$variant}.jpg");
+            try {
+                $response = Http::connectTimeout(5)
+                    ->timeout(20)
+                    ->retry(2, 250, throw: false)
+                    ->get("https://i.ytimg.com/vi/{$media->youtube_id}/{$variant}.jpg");
+            } catch (Throwable) {
+                continue;
+            }
             if (! $response->successful() || ! Str::startsWith((string) $response->header('Content-Type'), 'image/')) {
                 continue;
             }
 
-            File::put($cachePath, $response->body());
-            $dimensions = @getimagesize($cachePath);
-            if (is_array($dimensions) && $dimensions[0] >= 320 && $this->isUsableGeneratedThumbnail($cachePath)) {
+            $temporaryPath = $this->temporaryPath($destination);
+            File::put($temporaryPath, $response->body());
+            $dimensions = @getimagesize($temporaryPath);
+            if (is_array($dimensions) && $dimensions[0] >= 320 && $this->isUsableGeneratedThumbnail($temporaryPath)) {
+                $this->publish($temporaryPath, $destination);
+                $this->recordCanonicalThumbnail($media);
+
                 return true;
             }
 
-            $this->removeGeneratedThumbnail($cachePath);
+            $this->removeGeneratedThumbnail($temporaryPath);
         }
 
         return false;
@@ -84,8 +96,15 @@ class MediaThumbnail
 
     public function generate(Media $media): void
     {
-        if ($this->path($media) !== null) {
+        $destination = $this->canonicalPath($media, createDirectory: true);
+        if (is_file($destination) && filesize($destination) > 0) {
             return;
+        }
+
+        foreach ($this->existingThumbnailCandidates($media) as $candidate) {
+            if ($this->storeFromFile($media, $candidate)) {
+                return;
+            }
         }
 
         $mediaPath = $this->mediaPath($media);
@@ -93,24 +112,124 @@ class MediaThumbnail
             return;
         }
 
-        $cachePath = $this->cachePath($media, $mediaPath);
+        $temporaryPath = $this->temporaryPath($destination);
         try {
-            $this->extractAttachment($mediaPath, $cachePath);
-            if (! $this->isUsableGeneratedThumbnail($cachePath)) {
-                $this->removeGeneratedThumbnail($cachePath);
-                $this->extractAttachedPicture($mediaPath, $cachePath);
+            $this->extractAttachedPicture($mediaPath, $temporaryPath);
+            if (! $this->isUsableGeneratedThumbnail($temporaryPath)) {
+                $this->removeGeneratedThumbnail($temporaryPath);
+                $this->extractFrame($mediaPath, $temporaryPath, '00:00:03');
             }
-            if (! $this->isUsableGeneratedThumbnail($cachePath)) {
-                $this->removeGeneratedThumbnail($cachePath);
-                $this->extractFrame($mediaPath, $cachePath, '00:00:03');
+            if (! $this->isUsableGeneratedThumbnail($temporaryPath)) {
+                $this->removeGeneratedThumbnail($temporaryPath);
+                $this->extractFrame($mediaPath, $temporaryPath, '00:00:30');
             }
-            if (! $this->isUsableGeneratedThumbnail($cachePath)) {
-                $this->removeGeneratedThumbnail($cachePath);
-                $this->extractFrame($mediaPath, $cachePath, '00:00:30');
+            if ($this->isUsableGeneratedThumbnail($temporaryPath)) {
+                $this->publish($temporaryPath, $destination);
+                $this->recordCanonicalThumbnail($media);
             }
         } catch (Throwable) {
-            $this->removeGeneratedThumbnail($cachePath);
+            $this->removeGeneratedThumbnail($temporaryPath);
         }
+    }
+
+    public function storeFromFile(Media $media, string $sourcePath): bool
+    {
+        if (! is_file($sourcePath) || filesize($sourcePath) === 0) {
+            return false;
+        }
+
+        $destination = $this->canonicalPath($media, createDirectory: true);
+        $temporaryPath = $this->temporaryPath($destination);
+        $dimensions = @getimagesize($sourcePath);
+        if (is_array($dimensions) && ($dimensions[2] ?? null) === IMAGETYPE_JPEG) {
+            File::copy($sourcePath, $temporaryPath);
+        } else {
+            $process = new Process([
+                (string) config('auroraarchive.ffmpeg'), '-y', '-i', $sourcePath,
+                '-frames:v', '1', '-vf', 'scale=1280:-2', '-q:v', '3', $temporaryPath,
+            ]);
+            $process->setTimeout(30)->run();
+            if (! $process->isSuccessful()) {
+                $this->removeGeneratedThumbnail($temporaryPath);
+
+                return false;
+            }
+        }
+        if (! $this->isUsableGeneratedThumbnail($temporaryPath)) {
+            $this->removeGeneratedThumbnail($temporaryPath);
+
+            return false;
+        }
+
+        $this->publish($temporaryPath, $destination);
+        $this->recordCanonicalThumbnail($media);
+
+        return true;
+    }
+
+    public function backfill(Media $media, bool $online = true, bool $force = false): string
+    {
+        $destination = $this->canonicalPath($media);
+        $this->removeTemporaryFiles($destination);
+        if ($force) {
+            $this->removeGeneratedThumbnail($destination);
+        } elseif (is_file($destination) && filesize($destination) > 0) {
+            $this->recordCanonicalThumbnail($media);
+
+            return 'existing';
+        }
+
+        if ($online && $this->refreshFromYoutube($media)) {
+            return 'youtube';
+        }
+
+        $this->generate($media);
+
+        return is_file($destination) && filesize($destination) > 0 ? 'local' : 'failed';
+    }
+
+    public function canonicalPath(Media $media, bool $createDirectory = false): string
+    {
+        $directory = rtrim((string) config('auroraarchive.media_root'), '/\\').DIRECTORY_SEPARATOR.'Thumbs';
+        if ($createDirectory) {
+            File::ensureDirectoryExists($directory);
+        }
+
+        $youtubeId = preg_replace('/[^A-Za-z0-9_-]/', '_', $media->youtube_id);
+
+        return $directory.DIRECTORY_SEPARATOR.$youtubeId.'.jpg';
+    }
+
+    public function isCanonicalPath(Media $media, string $path): bool
+    {
+        $canonicalPath = realpath($this->canonicalPath($media));
+
+        return $canonicalPath !== false && realpath($path) === $canonicalPath;
+    }
+
+    /** @return list<string> */
+    private function existingThumbnailCandidates(Media $media): array
+    {
+        $candidates = [$this->youtubeThumbnailPath($media), $this->localThumbnailPath($media)];
+        $mediaPath = $this->mediaPath($media);
+        if ($mediaPath !== null) {
+            $sidecarPath = collect(scandir(dirname($mediaPath)) ?: [])
+                ->first(function (string $candidate) use ($media, $mediaPath): bool {
+                    $extension = Str::lower(pathinfo($candidate, PATHINFO_EXTENSION));
+                    $mediaName = pathinfo($mediaPath, PATHINFO_FILENAME);
+                    $candidateName = pathinfo($candidate, PATHINFO_FILENAME);
+
+                    return (Str::contains($candidate, $media->youtube_id) || Str::startsWith($candidateName, $mediaName))
+                        && in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'avif'], true)
+                        && is_file(dirname($mediaPath).DIRECTORY_SEPARATOR.$candidate);
+                });
+            if (is_string($sidecarPath)) {
+                $candidates[] = dirname($mediaPath).DIRECTORY_SEPARATOR.$sidecarPath;
+            }
+            $candidates[] = $this->cachePath($media, $mediaPath);
+        }
+
+        return array_values(array_filter($candidates, fn (mixed $path): bool => is_string($path) && is_file($path)));
     }
 
     private function localThumbnailPath(Media $media): ?string
@@ -125,7 +244,9 @@ class MediaThumbnail
 
     private function mediaPath(Media $media): ?string
     {
-        $relativePath = $media->files()->value('path');
+        $relativePath = $media->relationLoaded('files')
+            ? $media->files->first()?->path
+            : $media->files()->value('path');
 
         return is_string($relativePath) ? $this->safeMediaPath($relativePath) : null;
     }
@@ -156,16 +277,6 @@ class MediaThumbnail
         File::ensureDirectoryExists($cacheDirectory);
 
         return $cacheDirectory.DIRECTORY_SEPARATOR.$media->id.'-youtube.jpg';
-    }
-
-    private function extractAttachment(string $mediaPath, string $cachePath): void
-    {
-        $this->removeEmptyCacheFile($cachePath);
-        $process = new Process([
-            (string) config('auroraarchive.ffmpeg'), '-y', '-dump_attachment:t:0', $cachePath,
-            '-i', $mediaPath, '-t', '0', '-f', 'null', '-',
-        ]);
-        $process->setTimeout(10)->run();
     }
 
     private function extractAttachedPicture(string $mediaPath, string $cachePath): void
@@ -244,6 +355,43 @@ class MediaThumbnail
     {
         if (is_file($cachePath) && filesize($cachePath) === 0) {
             unlink($cachePath);
+        }
+    }
+
+    private function temporaryPath(string $destination): string
+    {
+        return dirname($destination).DIRECTORY_SEPARATOR.'.'.basename($destination).'.'.bin2hex(random_bytes(6)).'.jpg';
+    }
+
+    private function publish(string $temporaryPath, string $destination): void
+    {
+        File::delete($this->validationPath($temporaryPath));
+        if (is_file($destination)) {
+            File::delete($destination);
+        }
+        File::move($temporaryPath, $destination);
+    }
+
+    private function recordCanonicalThumbnail(Media $media): void
+    {
+        $relativePath = 'Thumbs/'.$media->youtube_id.'.jpg';
+        $metadata = $media->metadata ?? [];
+        if (Arr::get($metadata, 'local_thumbnail_path') === $relativePath
+            && $media->getRawOriginal('thumbnail_url') === route('media.thumbnail', $media, absolute: false)) {
+            return;
+        }
+
+        Arr::set($metadata, 'local_thumbnail_path', $relativePath);
+        $media->update([
+            'thumbnail_url' => route('media.thumbnail', $media, absolute: false),
+            'metadata' => $metadata,
+        ]);
+    }
+
+    private function removeTemporaryFiles(string $destination): void
+    {
+        foreach (glob(dirname($destination).DIRECTORY_SEPARATOR.'.'.basename($destination).'.*.jpg*') ?: [] as $path) {
+            File::delete($path);
         }
     }
 }

@@ -7,6 +7,7 @@ use App\Enums\MediaStatus;
 use App\Models\DownloadAttempt;
 use App\Models\Media;
 use App\Models\MediaFile;
+use App\Services\MediaThumbnail;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -34,7 +35,7 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
         return (string) $this->media->id;
     }
 
-    public function handle(YoutubeDownloader $youtube): void
+    public function handle(YoutubeDownloader $youtube, MediaThumbnail $thumbnails): void
     {
         $this->media->update(['status' => MediaStatus::Downloading]);
         $attempt = DownloadAttempt::create(['media_id' => $this->media->id, 'attempt_number' => $this->media->attempts()->count() + 1, 'status' => 'running', 'started_at' => now()]);
@@ -85,6 +86,12 @@ class DownloadMedia implements ShouldBeUnique, ShouldQueue
             'thumbnail_url' => $thumbnail === null ? (Arr::get($downloadMetadata, 'thumbnail') ?: $this->media->getRawOriginal('thumbnail_url')) : route('media.thumbnail', $this->media, absolute: false),
             'metadata' => $metadata,
         ]);
+
+        try {
+            $thumbnails->backfill($this->media->loadMissing('files'));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     public function failed(?Throwable $exception): void

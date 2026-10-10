@@ -100,6 +100,8 @@ test('a generated plain black thumbnail is discarded for regeneration', function
 });
 
 test('a youtube thumbnail refresh stores the published thumbnail with priority', function () {
+    $root = storage_path('framework/testing/media-thumbnail-youtube');
+    config()->set('auroraarchive.media_root', $root);
     $medium = Media::query()->create([
         'youtube_id' => 'AAAAAAAAAAA',
         'title' => 'Published thumbnail',
@@ -118,9 +120,78 @@ test('a youtube thumbnail refresh stores the published thumbnail with priority',
     $thumbnail = app(MediaThumbnail::class);
 
     expect($thumbnail->refreshFromYoutube($medium))->toBeTrue()
-        ->and($thumbnail->path($medium))->toEndWith($medium->id.'-youtube.jpg');
+        ->and(realpath((string) $thumbnail->path($medium)))->toBe(realpath($root.'/Thumbs/AAAAAAAAAAA.jpg'))
+        ->and($medium->refresh()->getRawOriginal('thumbnail_url'))->toBe(route('media.thumbnail', $medium, absolute: false))
+        ->and(data_get($medium->metadata, 'local_thumbnail_path'))->toBe('Thumbs/AAAAAAAAAAA.jpg');
 
-    foreach (glob(storage_path('app/thumbnails/'.$medium->id.'-*')) ?: [] as $path) {
-        File::delete($path);
-    }
+    File::deleteDirectory($root);
+});
+
+test('the thumbnail endpoint uses nginx for a canonical thumbnail', function () {
+    $root = storage_path('framework/testing/media-thumbnail-accelerated');
+    File::ensureDirectoryExists($root.'/Thumbs');
+    config()->set('auroraarchive.media_root', $root);
+    config()->set('auroraarchive.accelerated_streaming', true);
+    $user = User::factory()->create();
+    $medium = Media::query()->create([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'title' => 'Canonical thumbnail',
+        'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
+    ]);
+    File::put($root.'/Thumbs/AAAAAAAAAAA.jpg', 'image');
+
+    $this->actingAs($user)
+        ->get(route('media.thumbnail', $medium))
+        ->assertOk()
+        ->assertHeader('X-Accel-Redirect', '/protected-media/Thumbs/AAAAAAAAAAA.jpg')
+        ->assertHeader('Cache-Control', 'max-age=604800, private');
+
+    File::deleteDirectory($root);
+});
+
+test('a local thumbnail is normalised into the canonical thumbnail store', function () {
+    $root = storage_path('framework/testing/media-thumbnail-local-store');
+    File::ensureDirectoryExists($root);
+    config()->set('auroraarchive.media_root', $root);
+    $medium = Media::query()->create([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'title' => 'Local thumbnail',
+        'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
+    ]);
+    $sourcePath = $root.'/source.jpg';
+    $image = imagecreatetruecolor(640, 360);
+    imagefill($image, 0, 0, imagecolorallocate($image, 40, 120, 200));
+    imagejpeg($image, $sourcePath);
+    imagedestroy($image);
+
+    $thumbnail = app(MediaThumbnail::class);
+
+    expect($thumbnail->storeFromFile($medium, $sourcePath))->toBeTrue()
+        ->and(realpath((string) $thumbnail->path($medium)))->toBe(realpath($root.'/Thumbs/AAAAAAAAAAA.jpg'))
+        ->and(mime_content_type($root.'/Thumbs/AAAAAAAAAAA.jpg'))->toBe('image/jpeg');
+
+    File::deleteDirectory($root);
+});
+
+test('backfill falls back to a saved local thumbnail when youtube has none', function () {
+    $root = storage_path('framework/testing/media-thumbnail-online-fallback');
+    File::ensureDirectoryExists($root.'/archive');
+    config()->set('auroraarchive.media_root', $root);
+    $sourcePath = $root.'/archive/saved.jpg';
+    $image = imagecreatetruecolor(640, 360);
+    imagefill($image, 0, 0, imagecolorallocate($image, 40, 120, 200));
+    imagejpeg($image, $sourcePath);
+    imagedestroy($image);
+    $medium = Media::query()->create([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'title' => 'Unavailable on YouTube',
+        'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
+        'metadata' => ['local_thumbnail_path' => 'archive/saved.jpg'],
+    ]);
+    Http::fake(['i.ytimg.com/*' => Http::response('', 404)]);
+
+    expect(app(MediaThumbnail::class)->backfill($medium))->toBe('local')
+        ->and(File::exists($root.'/Thumbs/AAAAAAAAAAA.jpg'))->toBeTrue();
+
+    File::deleteDirectory($root);
 });

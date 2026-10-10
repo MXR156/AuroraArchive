@@ -14,6 +14,7 @@ test('an authenticated user can permanently delete media and matching files', fu
     $user = User::factory()->create();
     $root = storage_path('framework/testing/media-deletion');
     File::ensureDirectoryExists($root.'/channel');
+    File::ensureDirectoryExists($root.'/Thumbs');
     config()->set('auroraarchive.media_root', $root);
 
     $medium = Media::query()->create([
@@ -26,6 +27,7 @@ test('an authenticated user can permanently delete media and matching files', fu
     $thumbnailPath = $root.'/channel/video [AAAAAAAAAAA].webp';
     File::put($videoPath, 'video');
     File::put($thumbnailPath, 'thumbnail');
+    File::put($root.'/Thumbs/AAAAAAAAAAA.jpg', 'canonical thumbnail');
     MediaFile::query()->create(['media_id' => $medium->id, 'path' => 'channel/video [AAAAAAAAAAA].mkv']);
 
     $this->actingAs($user)
@@ -36,6 +38,7 @@ test('an authenticated user can permanently delete media and matching files', fu
     $this->assertModelMissing($medium);
     expect(File::exists($videoPath))->toBeFalse()
         ->and(File::exists($thumbnailPath))->toBeFalse()
+        ->and(File::exists($root.'/Thumbs/AAAAAAAAAAA.jpg'))->toBeFalse()
         ->and(MediaTombstone::query()->where('youtube_id', 'AAAAAAAAAAA')->where('reason', 'deleted_by_user')->exists())->toBeTrue();
 
     File::deleteDirectory($root);

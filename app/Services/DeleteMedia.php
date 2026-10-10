@@ -55,6 +55,11 @@ class DeleteMedia
             }
         }
 
+        $canonicalThumbnail = $this->safePath($root, 'Thumbs'.DIRECTORY_SEPARATOR.$media->youtube_id.'.jpg');
+        if ($canonicalThumbnail !== null) {
+            $paths[] = $canonicalThumbnail;
+        }
+
         $thumbnailPath = data_get($media->metadata, 'local_thumbnail_path');
         if (is_string($thumbnailPath) && ($path = $this->safePath($root, $thumbnailPath)) !== null) {
             $paths[] = $path;

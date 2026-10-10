@@ -27,6 +27,6 @@ class GenerateMediaThumbnail implements ShouldBeUnique, ShouldQueue
 
     public function handle(MediaThumbnail $thumbnail): void
     {
-        $thumbnail->generate($this->media);
+        $thumbnail->backfill($this->media->loadMissing('files'));
     }
 }

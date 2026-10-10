@@ -198,7 +198,7 @@ class MediaController extends Controller
         return Response::file($path, $headers)->setAutoEtag()->setAutoLastModified();
     }
 
-    public function thumbnail(Media $medium, MediaThumbnail $thumbnail): BinaryFileResponse|RedirectResponse
+    public function thumbnail(Media $medium, MediaThumbnail $thumbnail): BinaryFileResponse|RedirectResponse|HttpResponse
     {
         $path = $thumbnail->path($medium);
         if ($path === null) {
@@ -207,7 +207,17 @@ class MediaController extends Controller
             return redirect()->away('https://i.ytimg.com/vi/'.$medium->youtube_id.'/hqdefault.jpg');
         }
 
-        return Response::file($path, ['Content-Type' => mime_content_type($path) ?: 'image/jpeg']);
+        $headers = [
+            'Content-Type' => mime_content_type($path) ?: 'image/jpeg',
+            'Cache-Control' => 'private, max-age=604800',
+        ];
+        if (config('auroraarchive.accelerated_streaming') && $thumbnail->isCanonicalPath($medium, $path)) {
+            $headers['X-Accel-Redirect'] = '/protected-media/Thumbs/'.rawurlencode(basename($path));
+
+            return response('', 200, $headers);
+        }
+
+        return Response::file($path, $headers);
     }
 
     public function progress(Request $request, Media $medium): JsonResponse

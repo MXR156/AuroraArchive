@@ -18,7 +18,7 @@ test('thumbnail generation runs outside the web request', function () {
         'original_url' => 'https://www.youtube.com/watch?v=AAAAAAAAAAA',
     ]);
     $thumbnail = Mockery::mock(MediaThumbnail::class);
-    $thumbnail->shouldReceive('generate')->once()->with($medium);
+    $thumbnail->shouldReceive('backfill')->once()->with(Mockery::on(fn (Media $media): bool => $media->is($medium)))->andReturn('youtube');
 
     (new GenerateMediaThumbnail($medium))->handle($thumbnail);
 });
