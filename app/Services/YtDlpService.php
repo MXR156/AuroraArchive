@@ -17,6 +17,8 @@ use Throwable;
 
 class YtDlpService implements YoutubeDownloader
 {
+    public function __construct(private MediaStoragePath $storagePath) {}
+
     /** @return array<string, mixed>|null */
     public function metadataForRecovery(string $youtubeId, ?int $userId = null): ?array
     {
@@ -76,7 +78,7 @@ class YtDlpService implements YoutubeDownloader
     public function download(Media $media): array
     {
         $directory = $this->destination($media);
-        $template = $directory.'/%(upload_date>%Y-%m-%d)s - %(title).160B [%(id)s].%(ext)s';
+        $template = $directory.'/%(upload_date>%Y-%m-%d)s - %(title).150B [%(id)s].%(ext)s';
         $arguments = [
             '--newline',
             '--no-playlist',
@@ -710,22 +712,12 @@ class YtDlpService implements YoutubeDownloader
 
     private function destination(Media $media): string
     {
-        $root = rtrim(config('auroraarchive.media_root'), DIRECTORY_SEPARATOR);
-        $sourceFolder = $this->safeFolderName($media->source?->name ?: $media->channel_name ?: 'Unsorted');
-        $path = $root.DIRECTORY_SEPARATOR.$sourceFolder;
-        if ($media->source?->type === 'playlist' && filled($media->channel_name)) {
-            $path .= DIRECTORY_SEPARATOR.$this->safeFolderName($media->channel_name);
-        }
+        $path = $this->storagePath->absoluteDirectory($media);
         if (! is_dir($path) && ! mkdir($path, 0775, true) && ! is_dir($path)) {
             throw new RuntimeException('Media destination is not writable.');
         }
 
         return $path;
-    }
-
-    private function safeFolderName(string $name): string
-    {
-        return Str::of($name)->replace(['..', '/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-')->trim()->limit(120, '')->toString() ?: 'Unsorted';
     }
 
     private function sanitise(string $value): string

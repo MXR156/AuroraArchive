@@ -4,6 +4,7 @@ use App\Contracts\YoutubeDownloader;
 use App\Enums\MediaStatus;
 use App\Jobs\DownloadMedia;
 use App\Models\Media;
+use App\Services\MediaOrganiser;
 use App\Services\MediaThumbnail;
 use App\Services\YtDlpService;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -19,6 +20,24 @@ it('uses the canonical watch URL for youtube videos', function () {
     ]);
 
     expect($medium->youtubeVideoUrl())->toBe('https://www.youtube.com/watch?v=V299JJ2Rgu8');
+});
+
+it('stores new downloads under the stable channel ID directory', function () {
+    $root = storage_path('framework/testing/download-destination');
+    File::ensureDirectoryExists($root);
+    config()->set('auroraarchive.media_root', $root);
+    $medium = new Media([
+        'youtube_id' => 'AAAAAAAAAAA',
+        'channel_name' => 'A name that can change',
+        'channel_id' => 'UC-STABLE-ID',
+    ]);
+    $method = new ReflectionMethod(YtDlpService::class, 'destination');
+
+    $destination = $method->invoke(app(YtDlpService::class), $medium);
+
+    expect(realpath($destination))->toBe(realpath($root.'/Videos/UC-STABLE-ID'));
+
+    File::deleteDirectory($root);
 });
 
 it('reports disabled external playback separately from unavailable videos', function () {
@@ -37,7 +56,7 @@ it('reports disabled external playback separately from unavailable videos', func
         'version' => 'nightly',
     ]);
 
-    expect(fn () => (new DownloadMedia($medium))->handle($youtube, Mockery::mock(MediaThumbnail::class)))
+    expect(fn () => (new DownloadMedia($medium))->handle($youtube, Mockery::mock(MediaThumbnail::class), Mockery::mock(MediaOrganiser::class)))
         ->toThrow(RuntimeException::class, 'Playback restricted');
     expect($medium->attempts()->firstOrFail()->error_category)->toBe('Playback restricted');
 });
@@ -170,8 +189,10 @@ it('stores the authoritative metadata snapshot when a download succeeds', functi
 
     $thumbnails = Mockery::mock(MediaThumbnail::class);
     $thumbnails->shouldReceive('backfill')->once()->andReturn('local');
+    $organiser = Mockery::mock(MediaOrganiser::class);
+    $organiser->shouldReceive('organiseMedium')->once()->andReturn(['scanned' => 1, 'planned' => 0, 'moved' => 1, 'existing' => 0, 'deduplicated' => 0, 'conflicts' => 0, 'missing' => 0, 'failed' => 0]);
 
-    (new DownloadMedia($medium))->handle($youtube, $thumbnails);
+    (new DownloadMedia($medium))->handle($youtube, $thumbnails, $organiser);
 
     $medium->refresh();
     expect($medium->status)->toBe(MediaStatus::Downloaded)
@@ -202,7 +223,7 @@ it('reports age verification failures separately from unavailable videos', funct
         'version' => 'nightly',
     ]);
 
-    expect(fn () => (new DownloadMedia($medium))->handle($youtube, Mockery::mock(MediaThumbnail::class)))
+    expect(fn () => (new DownloadMedia($medium))->handle($youtube, Mockery::mock(MediaThumbnail::class), Mockery::mock(MediaOrganiser::class)))
         ->toThrow(RuntimeException::class, 'Age verification / PO token required');
     expect($medium->attempts()->firstOrFail()->error_category)->toBe('Age verification / PO token required');
 });

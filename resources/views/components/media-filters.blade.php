@@ -1,6 +1,6 @@
 @props(['clearUrl', 'playlistOrder' => false])
 <form method="GET" class="grid gap-2 sm:grid-cols-[minmax(12rem,1fr)_12rem_12rem_auto]" data-media-filters>
-    <input name="q" value="{{ request('q') }}" placeholder="Search videos or creators" class="field">
+    <input name="q" value="{{ request('q') }}" placeholder="Search titles, creators or IDs" class="field">
     <select name="filter" class="field" aria-label="Media filter">
         @foreach([
             '' => 'All media',

@@ -77,6 +77,28 @@ test('the library supports status filtering and title sorting', function () {
         ->assertDontSee('Failed video');
 });
 
+test('the library search matches youtube video and channel IDs', function () {
+    $user = User::factory()->create();
+    $videoMatch = filterableMedium('VIDEOID0001', 'Video identifier result', MediaStatus::Downloaded, true);
+    $videoMatch->update(['channel_id' => 'UC-FIRST']);
+    $channelMatch = filterableMedium('VIDEOID0002', 'Channel identifier result', MediaStatus::Downloaded, true);
+    $channelMatch->update(['channel_id' => 'UC-SEARCHABLE-ID']);
+    filterableMedium('VIDEOID0003', 'Unrelated result', MediaStatus::Downloaded, true);
+
+    $this->actingAs($user)
+        ->get(route('library', ['q' => 'VIDEOID0001']))
+        ->assertOk()
+        ->assertSee('Video identifier result')
+        ->assertDontSee('Channel identifier result')
+        ->assertDontSee('Unrelated result');
+
+    $this->get(route('library', ['q' => 'UC-SEARCHABLE-ID']))
+        ->assertOk()
+        ->assertSee('Channel identifier result')
+        ->assertDontSee('Video identifier result')
+        ->assertDontSee('Unrelated result');
+});
+
 test('the downloads page includes queued and downloading media', function () {
     $user = User::factory()->create();
     filterableMedium('AAAAAAAAAAA', 'Queued video', MediaStatus::Queued, false);

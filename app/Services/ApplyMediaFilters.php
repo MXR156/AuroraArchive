@@ -15,7 +15,9 @@ class ApplyMediaFilters
         if ($search !== '') {
             $query->where(fn ($nested) => $nested
                 ->where('title', 'like', '%'.$search.'%')
-                ->orWhere('channel_name', 'like', '%'.$search.'%'));
+                ->orWhere('channel_name', 'like', '%'.$search.'%')
+                ->orWhere('channel_id', 'like', '%'.$search.'%')
+                ->orWhere('youtube_id', 'like', '%'.$search.'%'));
         }
 
         $filter = $request->string('filter')->toString() ?: $request->string('status')->toString();

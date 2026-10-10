@@ -20,6 +20,8 @@ class ArchiveConsolidation
 {
     private const MEDIA_EXTENSIONS = ['mkv', 'mp4', 'webm', 'mov', 'm4v'];
 
+    public function __construct(private MediaStoragePath $storagePath) {}
+
     /**
      * @param  callable(string): void|null  $report
      * @return array{scanned:int,recognised:int,unrecognised:int,unique_videos:int,duplicates:int,planned:int,copied:int,existing:int,conflicts:int,failed:int,files_attached:int,playlists_created:int,memberships_attached:int}
@@ -208,18 +210,13 @@ class ArchiveConsolidation
 
     private function destination(array $candidate, ?Media $medium): string
     {
-        $playlist = $candidate['playlist_name'] ?: 'Recovered';
-        $channel = $medium?->channel_name ?: $candidate['folder_channel'] ?: 'Unknown channel';
-        $title = $medium?->title ?: $candidate['filename_title'] ?: $candidate['youtube_id'];
-        $date = $medium?->published_at?->format('Y-m-d');
-        $filename = ($date ? $date.' - ' : '').$this->safeName($title, 150).' ['.$candidate['youtube_id'].'].'.$candidate['extension'];
+        $medium ??= new Media([
+            'youtube_id' => $candidate['youtube_id'],
+            'title' => $candidate['filename_title'] ?: $candidate['youtube_id'],
+            'channel_name' => $candidate['folder_channel'],
+        ]);
 
-        return $this->safeName($playlist, 100).'/'.$this->safeName($channel, 100).'/'.$filename;
-    }
-
-    private function safeName(string $value, int $limit): string
-    {
-        return Str::of($value)->replace(['..', '/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-')->trim()->limit($limit, '')->toString() ?: 'Unknown';
+        return $this->storagePath->relativeFile($medium, $candidate['extension']);
     }
 
     private function titleFromFilename(string $filename): string

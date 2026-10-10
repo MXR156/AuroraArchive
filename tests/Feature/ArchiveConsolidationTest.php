@@ -32,6 +32,7 @@ test('it copies one best candidate verifies it and reconstructs playlist members
         'youtube_id' => 'ABCDEFGHIJK',
         'title' => 'Recovered title',
         'channel_name' => 'Recovered Channel',
+        'channel_id' => 'UCRECOVERED',
         'published_at' => '2024-01-02',
         'original_url' => 'https://www.youtube.com/watch?v=ABCDEFGHIJK',
         'status' => MediaStatus::Discovered,
@@ -48,13 +49,13 @@ test('it copies one best candidate verifies it and reconstructs playlist members
         manifestPath: $manifest,
     );
 
-    $copied = $this->destination.'/Recovered Playlist/Recovered Channel/2024-01-02 - Recovered title [ABCDEFGHIJK].mp4';
+    $copied = $this->destination.'/Videos/UCRECOVERED/2024-01-02 - Recovered title [ABCDEFGHIJK].mp4';
     expect($stats)->toMatchArray(['scanned' => 2, 'unique_videos' => 1, 'duplicates' => 1, 'copied' => 1, 'files_attached' => 1, 'playlists_created' => 1, 'memberships_attached' => 1])
         ->and(File::get($copied))->toBe(File::get($larger))
         ->and(File::get($smaller))->toBe('small')
         ->and(File::get($larger))->toBe('the larger and preferred surviving file')
         ->and($medium->refresh()->status)->toBe(MediaStatus::Downloaded)
-        ->and($medium->files->first()->path)->toBe('Recovered Playlist/Recovered Channel/2024-01-02 - Recovered title [ABCDEFGHIJK].mp4')
+        ->and($medium->files->first()->path)->toBe('Videos/UCRECOVERED/2024-01-02 - Recovered title [ABCDEFGHIJK].mp4')
         ->and(Playlist::query()->firstOrFail()->media)->toHaveCount(1)
         ->and(File::exists($manifest))->toBeTrue();
 });
@@ -82,7 +83,7 @@ test('dry runs create no media files or database attachments', function () {
 test('it never overwrites a conflicting destination file', function () {
     File::put($this->source.'/video/Recovered Channel/video [ABCDEFGHIJK].mp4', 'source content');
     Media::query()->create(['youtube_id' => 'ABCDEFGHIJK', 'title' => 'Video', 'channel_name' => 'Recovered Channel', 'original_url' => 'https://www.youtube.com/watch?v=ABCDEFGHIJK']);
-    $destination = $this->destination.'/Recovered/Recovered Channel/Video [ABCDEFGHIJK].mp4';
+    $destination = $this->destination.'/Videos/Orphaned/Video [ABCDEFGHIJK].mp4';
     File::ensureDirectoryExists(dirname($destination));
     File::put($destination, 'existing different content');
 

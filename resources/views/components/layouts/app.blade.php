@@ -63,7 +63,7 @@
         <main class="min-w-0 lg:col-start-2">
             <header class="sticky top-0 z-20 flex h-16 items-center border-b border-white/8 bg-zinc-950/95 px-4 backdrop-blur sm:px-7">
                 <form action="{{ route('library') }}" class="mx-auto w-full max-w-xl">
-                    <input name="q" value="{{ request('q') }}" placeholder="Search your archive" class="w-full rounded-full border border-white/10 bg-zinc-900 px-5 py-2.5 text-sm outline-none focus:border-zinc-600">
+                    <input name="q" value="{{ request('q') }}" placeholder="Search titles, creators or IDs" class="w-full rounded-full border border-white/10 bg-zinc-900 px-5 py-2.5 text-sm outline-none focus:border-zinc-600">
                 </form>
             </header>
             @if($youtubeCredential && in_array($youtubeCredential->status->value, ['rejected', 'possibly_expired']))
