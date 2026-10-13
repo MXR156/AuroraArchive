@@ -75,6 +75,52 @@ test('an inconclusive recheck no longer presents an old audit result as confirme
         ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('unknown');
 });
 
+test('an authenticated user can override and reset youtube availability', function () {
+    $user = User::factory()->create();
+    $medium = availabilityMedium('AAAAAAAAAAA');
+    $medium->update(['metadata' => ['youtube' => ['availability_check_status' => 'available']]]);
+
+    $this->actingAs($user)
+        ->patch(route('media.availability.update', $medium), ['availability_override' => 'unavailable'])
+        ->assertRedirect()
+        ->assertSessionHas('success', 'YouTube availability updated.');
+
+    expect($medium->refresh()->isUnavailableOnYoutube())->toBeTrue()
+        ->and(data_get($medium->metadata, 'youtube.availability_override'))->toBe('unavailable')
+        ->and(data_get($medium->metadata, 'youtube.availability_overridden_at'))->not->toBeNull();
+
+    $this->patch(route('media.availability.update', $medium), ['availability_override' => ''])
+        ->assertRedirect();
+
+    expect($medium->refresh()->isUnavailableOnYoutube())->toBeFalse()
+        ->and(data_get($medium->metadata, 'youtube.availability_override'))->toBeNull()
+        ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('available');
+});
+
+test('automatic checks retain a manual availability override', function () {
+    $medium = availabilityMedium('AAAAAAAAAAA');
+    $medium->update(['metadata' => ['youtube' => ['availability_override' => 'available']]]);
+    $youtube = Mockery::mock(YoutubeDownloader::class);
+    $youtube->shouldReceive('checkAvailability')->once()->andReturn([
+        'status' => 'unavailable',
+        'reason' => 'Private video',
+    ]);
+
+    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class));
+
+    expect($medium->refresh()->isUnavailableOnYoutube())->toBeFalse()
+        ->and(data_get($medium->metadata, 'youtube.availability_override'))->toBe('available')
+        ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('unavailable');
+});
+
+test('availability overrides reject unexpected values', function () {
+    $this->actingAs(User::factory()->create())
+        ->patch(route('media.availability.update', availabilityMedium('AAAAAAAAAAA')), [
+            'availability_override' => 'maybe',
+        ])
+        ->assertSessionHasErrors('availability_override');
+});
+
 test('the audit queues checks only for media with archived files', function () {
     Queue::fake();
     $archived = availabilityMedium('AAAAAAAAAAA');

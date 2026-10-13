@@ -93,6 +93,11 @@ class Media extends Model
 
     public function isUnavailableOnYoutube(): bool
     {
+        $override = Arr::get($this->metadata, 'youtube.availability_override');
+        if (in_array($override, ['available', 'unavailable'], true)) {
+            return $override === 'unavailable';
+        }
+
         $checkStatus = Arr::get($this->metadata, 'youtube.availability_check_status');
         if (in_array($checkStatus, ['available', 'unavailable'], true)) {
             return $checkStatus === 'unavailable';

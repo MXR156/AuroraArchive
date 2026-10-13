@@ -39,7 +39,7 @@ test('the library filters downloaded and not downloaded media using registered f
 test('the library can find archived videos reported unavailable by youtube', function () {
     $user = User::factory()->create();
     $archived = filterableMedium('AAAAAAAAAAA', 'Preserved removed video', MediaStatus::Downloaded, true);
-    $archived->update(['metadata' => ['youtube' => ['unavailable' => true]]]);
+    $archived->update(['metadata' => ['youtube' => ['availability_check_status' => 'unavailable']]]);
     $legacy = filterableMedium('BBBBBBBBBBB', 'Legacy removed video', MediaStatus::Downloaded, true);
     $legacy->update(['metadata' => ['availability' => 'private']]);
     $tubeSync = filterableMedium('CCCCCCCCCCC', 'TubeSync removed video', MediaStatus::Downloaded, true);
@@ -48,6 +48,10 @@ test('the library can find archived videos reported unavailable by youtube', fun
     $available->update(['metadata' => ['availability' => 'private', 'youtube' => ['availability_check_status' => 'available', 'unavailable' => false]]]);
     $placeholder = filterableMedium('EEEEEEEEEEE', 'Unavailable without archive', MediaStatus::Failed, false);
     $placeholder->update(['metadata' => ['youtube' => ['unavailable' => true]]]);
+    $manualAvailable = filterableMedium('FFFFFFFFFFF', 'Manually available video', MediaStatus::Downloaded, true);
+    $manualAvailable->update(['metadata' => ['youtube' => ['availability_check_status' => 'unavailable', 'availability_override' => 'available']]]);
+    $manualRemoved = filterableMedium('GGGGGGGGGGG', 'Manually removed video', MediaStatus::Downloaded, true);
+    $manualRemoved->update(['metadata' => ['youtube' => ['availability_check_status' => 'available', 'availability_override' => 'unavailable']]]);
 
     $this->actingAs($user)
         ->get(route('library', ['filter' => 'youtube_unavailable']))
@@ -55,8 +59,10 @@ test('the library can find archived videos reported unavailable by youtube', fun
         ->assertSee('Preserved removed video')
         ->assertSee('Legacy removed video')
         ->assertSee('TubeSync removed video')
+        ->assertSee('Manually removed video')
         ->assertSee('Removed from YouTube')
         ->assertDontSee('Available archived video')
+        ->assertDontSee('Manually available video')
         ->assertDontSee('Unavailable without archive');
 
     $this->get(route('media.show', $archived))

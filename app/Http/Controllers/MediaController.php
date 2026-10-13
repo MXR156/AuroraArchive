@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\MediaStatus;
 use App\Http\Requests\BulkManageMediaRequest;
 use App\Http\Requests\BulkRetryMediaRequest;
+use App\Http\Requests\UpdateMediaAvailabilityRequest;
 use App\Http\Requests\UpdateMediaRequest;
 use App\Jobs\DownloadMedia;
 use App\Jobs\GenerateMediaThumbnail;
@@ -167,6 +168,22 @@ class MediaController extends Controller
         $medium->update([...$request->validated(), 'metadata' => $metadata]);
 
         return redirect()->route('media.show', $medium)->with('success', 'Video metadata updated.');
+    }
+
+    public function updateAvailability(UpdateMediaAvailabilityRequest $request, Media $medium): RedirectResponse
+    {
+        $metadata = $medium->metadata ?? [];
+        $override = $request->validated('availability_override');
+        if ($override === null) {
+            Arr::forget($metadata, 'youtube.availability_override');
+            Arr::forget($metadata, 'youtube.availability_overridden_at');
+        } else {
+            Arr::set($metadata, 'youtube.availability_override', $override);
+            Arr::set($metadata, 'youtube.availability_overridden_at', now()->toIso8601String());
+        }
+        $medium->update(['metadata' => $metadata]);
+
+        return back()->with('success', 'YouTube availability updated.');
     }
 
     public function destroy(Media $medium, DeleteMedia $deleteMedia): RedirectResponse

@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/media/bulk', [MediaController::class, 'bulkManage'])->name('media.bulk-manage');
     Route::post('/media/retry', [MediaController::class, 'bulkRetry'])->name('media.bulk-retry');
     Route::put('/media/{medium}', [MediaController::class, 'update'])->name('media.update');
+    Route::patch('/media/{medium}/availability', [MediaController::class, 'updateAvailability'])->name('media.availability.update');
     Route::get('/media/{medium}/stream', [MediaController::class, 'stream'])->name('media.stream');
     Route::get('/media/{medium}/thumbnail', [MediaController::class, 'thumbnail'])->name('media.thumbnail');
     Route::post('/media/{medium}/thumbnail/refresh', [MediaController::class, 'refreshThumbnail'])->name('media.thumbnail.refresh');

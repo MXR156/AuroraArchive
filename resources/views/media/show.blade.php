@@ -131,9 +131,21 @@
             @if($medium->description)
                 <div class="mt-6 whitespace-pre-line rounded-2xl bg-zinc-900 p-5 text-sm leading-6 text-zinc-300">{{ $medium->description }}</div>
             @endif
-            @if(data_get($medium->metadata, 'youtube.availability_checked_at'))
-                <section class="mt-8 border-t border-white/10 pt-5">
-                    <h2 class="text-sm font-semibold">YouTube availability diagnostics</h2>
+            @php($availabilityOverride = data_get($medium->metadata, 'youtube.availability_override'))
+            <section class="mt-8 border-t border-white/10 pt-5">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold">YouTube availability</h2>
+                    <form method="POST" action="{{ route('media.availability.update', $medium) }}" class="inline-flex overflow-hidden rounded border border-white/10">
+                        @csrf
+                        @method('PATCH')
+                        @foreach(['' => 'Automatic', 'available' => 'Available', 'unavailable' => 'Removed'] as $value => $label)
+                            @php($selected = ($availabilityOverride ?? '') === $value)
+                            <button name="availability_override" value="{{ $value }}" class="px-3 py-2 text-xs font-semibold {{ $selected ? 'bg-zinc-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200' }}" aria-pressed="{{ $selected ? 'true' : 'false' }}">{{ $label }}</button>
+                        @endforeach
+                    </form>
+                </div>
+                @if(data_get($medium->metadata, 'youtube.availability_checked_at'))
+                    <h3 class="mt-4 text-xs font-semibold uppercase text-zinc-500">Latest automatic check</h3>
                     <p class="mt-2 text-sm text-zinc-400">
                         {{ ucfirst(data_get($medium->metadata, 'youtube.availability_check_status', 'unknown')) }}
                         &middot; {{ \Illuminate\Support\Carbon::parse(data_get($medium->metadata, 'youtube.availability_checked_at'))->diffForHumans() }}
@@ -150,8 +162,8 @@
                             </div>
                         @endforeach
                     </div>
-                </section>
-            @endif
+                @endif
+            </section>
             @if($medium->attempts->isNotEmpty())
                 <section class="mt-8">
                     <h2 class="mb-3 text-lg font-semibold">Download diagnostics</h2>
