@@ -173,7 +173,7 @@ class YtDlpService implements YoutubeDownloader
 
         return [
             'status' => 'unknown',
-            'reason' => $ytDlpAvailability['reason'] ?: $webpageAvailability['reason'],
+            'reason' => collect($evidence)->pluck('reason')->first(fn (mixed $reason): bool => filled($reason)),
             'evidence' => $evidence,
         ];
     }

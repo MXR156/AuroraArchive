@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Media;
 use App\Services\MediaThumbnail;
+use App\Services\RecordMediaAvailability;
 use App\Services\YtDlpService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -34,13 +35,22 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
         return (string) $this->media->id;
     }
 
-    public function handle(YtDlpService $youtube, MediaThumbnail $thumbnail): void
+    public function handle(YtDlpService $youtube, MediaThumbnail $thumbnail, RecordMediaAvailability $recordAvailability): void
     {
         $remote = $youtube->metadataForRecovery($this->media->youtube_id, $this->userId);
         if ($remote !== null) {
             $this->updateMetadata($remote);
+            $recordAvailability->handle($this->media, [
+                'status' => 'available',
+                'reason' => null,
+                'evidence' => ['metadata_refresh' => ['status' => 'available', 'reason' => null]],
+            ]);
         } else {
             $this->recordFailedMetadataRefresh();
+            $recordAvailability->handle(
+                $this->media,
+                $youtube->checkAvailability($this->media->loadMissing('source')),
+            );
         }
 
         $thumbnail->refreshFromYoutube($this->media);
@@ -62,20 +72,6 @@ class RefreshMediaThumbnail implements ShouldBeUnique, ShouldQueue
         ]));
         Arr::set($metadata, 'youtube.metadata_refreshed_at', now()->toIso8601String());
         Arr::set($metadata, 'youtube.metadata_refresh_status', 'updated');
-        Arr::set($metadata, 'youtube.availability_checked_at', now()->toIso8601String());
-        Arr::set($metadata, 'youtube.availability_check_status', 'available');
-        Arr::set($metadata, 'youtube.availability_check_reason', null);
-        Arr::set($metadata, 'youtube.availability_check_evidence.metadata_refresh', [
-            'status' => 'available',
-            'reason' => null,
-        ]);
-        Arr::set($metadata, 'youtube.availability_checked_at', now()->toIso8601String());
-        Arr::set($metadata, 'youtube.availability_check_status', 'available');
-        Arr::set($metadata, 'youtube.availability_check_reason', null);
-        Arr::set($metadata, 'youtube.availability_check_evidence.metadata_refresh', [
-            'status' => 'available',
-            'reason' => null,
-        ]);
 
         foreach (['channel_url', 'uploader_url'] as $key) {
             if (filled(Arr::get($remote, $key))) {

@@ -9,6 +9,7 @@ use App\Models\Media;
 use App\Models\MediaFile;
 use App\Models\User;
 use App\Services\AvailabilityAudit;
+use App\Services\RecordMediaAvailability;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -37,7 +38,7 @@ test('a private youtube response flags archived media as unavailable', function 
         'reason' => 'Private video',
     ]);
 
-    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class));
+    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class), app(RecordMediaAvailability::class));
 
     $medium->refresh();
     expect($medium->isUnavailableOnYoutube())->toBeTrue()
@@ -54,7 +55,7 @@ test('a successful youtube response clears a stale unavailable flag', function (
         'reason' => null,
     ]);
 
-    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class));
+    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class), app(RecordMediaAvailability::class));
 
     expect($medium->refresh()->isUnavailableOnYoutube())->toBeFalse()
         ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('available');
@@ -69,7 +70,7 @@ test('an inconclusive recheck no longer presents an old audit result as confirme
         'reason' => 'Video unavailable',
     ]);
 
-    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class));
+    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class), app(RecordMediaAvailability::class));
 
     expect($medium->refresh()->isUnavailableOnYoutube())->toBeFalse()
         ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('unknown');
@@ -106,7 +107,7 @@ test('automatic checks retain a manual availability override', function () {
         'reason' => 'Private video',
     ]);
 
-    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class));
+    (new CheckMediaAvailability($medium))->handle($youtube, app(AvailabilityAudit::class), app(RecordMediaAvailability::class));
 
     expect($medium->refresh()->isUnavailableOnYoutube())->toBeFalse()
         ->and(data_get($medium->metadata, 'youtube.availability_override'))->toBe('available')
@@ -130,7 +131,7 @@ test('the audit queues checks only for media with archived files', function () {
 
     Queue::assertPushed(CheckMediaAvailability::class, 1);
     Queue::assertPushed(CheckMediaAvailability::class, fn (CheckMediaAvailability $job): bool => $job->media->is($archived) && $job->queue === 'maintenance');
-    Queue::assertPushed(GenerateMediaThumbnail::class, 1);
+    Queue::assertNotPushed(GenerateMediaThumbnail::class);
 });
 
 test('an authenticated user can queue an availability audit', function () {
@@ -173,7 +174,7 @@ test('an availability audit reports progress and prevents duplicate runs', funct
             'watch_page' => ['status' => 'available', 'reason' => null],
         ],
     ]);
-    (new CheckMediaAvailability($medium, $queued['id']))->handle($youtube, $audit);
+    (new CheckMediaAvailability($medium, $queued['id']))->handle($youtube, $audit, app(RecordMediaAvailability::class));
 
     expect($audit->latest($user->id))->toMatchArray([
         'status' => 'completed',
@@ -181,4 +182,9 @@ test('an availability audit reports progress and prevents duplicate runs', funct
         'processed' => 1,
         'available' => 1,
     ])->and(data_get($medium->refresh()->metadata, 'youtube.availability_check_evidence.yt_dlp.status'))->toBe('available');
+
+    $this->actingAs($user)
+        ->get(route('library'))
+        ->assertOk()
+        ->assertDontSee('data-availability-audit', escape: false);
 });

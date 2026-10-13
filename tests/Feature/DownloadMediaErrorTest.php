@@ -133,6 +133,19 @@ it('does not mark a video unavailable when another youtube probe confirms it is 
         ->and($result['evidence']['watch_page']['status'])->toBe('available');
 });
 
+it('reports the available reason when every youtube availability probe is inconclusive', function () {
+    $method = new ReflectionMethod(YtDlpService::class, 'consolidateAvailability');
+    $result = $method->invoke(app(YtDlpService::class), [
+        'yt_dlp' => ['status' => 'unknown', 'reason' => 'Authentication was inconclusive'],
+        'watch_page' => ['status' => 'unknown', 'reason' => null],
+    ]);
+
+    expect($result)->toMatchArray([
+        'status' => 'unknown',
+        'reason' => 'Authentication was inconclusive',
+    ]);
+});
+
 it('extracts recovery metadata from an available youtube watch page', function () {
     $method = new ReflectionMethod(YtDlpService::class, 'webpageMetadataResult');
     $html = '<script>var ytInitialPlayerResponse = {"playabilityStatus":{"status":"OK"},"videoDetails":{"videoId":"AAAAAAAAAAA","title":"Watch page title","shortDescription":"Watch page description","author":"Watch page channel","channelId":"UC-WATCH","lengthSeconds":"123","thumbnail":{"thumbnails":[{"url":"https://example.test/small.jpg"},{"url":"https://example.test/large.jpg"}]}},"microformat":{"playerMicroformatRenderer":{"publishDate":"2024-01-02","ownerProfileUrl":"https://www.youtube.com/channel/UC-WATCH"}}};</script>';

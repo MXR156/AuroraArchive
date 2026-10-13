@@ -18,6 +18,9 @@ class LibraryController extends Controller
         $media = $filters->handle(Media::query(), $request)->paginate(24)->withQueryString();
         $playlists = $request->user()->playlists()->orderBy('name')->get();
         $availabilityAudit = $audit->latest($request->user()->id);
+        if (($availabilityAudit['status'] ?? null) === 'completed') {
+            $availabilityAudit = null;
+        }
 
         return view('library', compact('media', 'playlists', 'availabilityAudit'));
     }
@@ -32,7 +35,7 @@ class LibraryController extends Controller
         $auditId = $audit->queue($request->user()->id);
         QueueMediaAvailabilityChecks::dispatch($auditId);
 
-        return back()->with('success', 'YouTube availability and thumbnail audit queued. Results will appear progressively as videos are checked.');
+        return back()->with('success', 'YouTube availability audit queued. Results will appear progressively as videos are checked.');
     }
 
     public function availabilityStatus(Request $request, AvailabilityAudit $audit): JsonResponse

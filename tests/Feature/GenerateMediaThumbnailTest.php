@@ -5,6 +5,7 @@ use App\Jobs\RefreshMediaThumbnail;
 use App\Models\Media;
 use App\Models\User;
 use App\Services\MediaThumbnail;
+use App\Services\RecordMediaAvailability;
 use App\Services\YtDlpService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -73,7 +74,7 @@ test('the youtube refresh updates metadata and the published thumbnail', functio
     $thumbnail = Mockery::mock(MediaThumbnail::class);
     $thumbnail->shouldReceive('refreshFromYoutube')->once()->with(Mockery::on(fn (Media $refreshedMedia): bool => $refreshedMedia->is($medium)))->andReturnTrue();
 
-    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail);
+    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail, app(RecordMediaAvailability::class));
 
     $medium->refresh();
     expect($medium->title)->toBe('Current YouTube title')
@@ -98,12 +99,18 @@ test('the youtube refresh records when no metadata was returned', function () {
     ]);
     $youtube = Mockery::mock(YtDlpService::class);
     $youtube->shouldReceive('metadataForRecovery')->once()->andReturnNull();
+    $youtube->shouldReceive('checkAvailability')->once()->andReturn([
+        'status' => 'unavailable',
+        'reason' => 'Private video',
+        'evidence' => ['yt_dlp' => ['status' => 'unavailable', 'reason' => 'Private video']],
+    ]);
     $thumbnail = Mockery::mock(MediaThumbnail::class);
     $thumbnail->shouldReceive('refreshFromYoutube')->once()->andReturnFalse();
 
-    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail);
+    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail, app(RecordMediaAvailability::class));
 
     expect(data_get($medium->refresh()->metadata, 'youtube.metadata_refresh_status'))->toBe('no_metadata')
+        ->and(data_get($medium->metadata, 'youtube.availability_check_status'))->toBe('unavailable')
         ->and(data_get($medium->metadata, 'youtube.metadata_refreshed_at'))->not->toBeNull();
 });
 
@@ -126,7 +133,7 @@ test('the youtube refresh preserves manually edited metadata', function () {
     $thumbnail = Mockery::mock(MediaThumbnail::class);
     $thumbnail->shouldReceive('refreshFromYoutube')->once()->andReturnTrue();
 
-    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail);
+    (new RefreshMediaThumbnail($medium, 123))->handle($youtube, $thumbnail, app(RecordMediaAvailability::class));
 
     $medium->refresh();
     expect($medium->title)->toBe('Manual title')

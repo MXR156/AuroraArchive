@@ -77,7 +77,11 @@ document.querySelectorAll('[data-availability-audit]').forEach((panel) => {
         panel.querySelector('[data-audit-unavailable]').textContent = audit.unavailable;
         panel.querySelector('[data-audit-unknown]').textContent = audit.unknown;
         panel.querySelector('[data-audit-bar]').style.width = `${audit.total > 0 ? Math.min(100, audit.processed / audit.total * 100) : 0}%`;
-        if (audit.status !== 'completed') window.setTimeout(refresh, 3000);
+        if (audit.status === 'completed') {
+            window.setTimeout(() => panel.remove(), 5000);
+            return;
+        }
+        window.setTimeout(refresh, 3000);
     };
     if (panel.querySelector('[data-audit-state]').textContent.trim().toLowerCase() !== 'completed') window.setTimeout(refresh, 1000);
 });
