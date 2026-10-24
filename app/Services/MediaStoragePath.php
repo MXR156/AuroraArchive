@@ -36,10 +36,12 @@ class MediaStoragePath
 
     private function safeName(string $value, int $limit): string
     {
-        return Str::of($value)
+        $sanitised = Str::of($value)
             ->replace(['..', '/', '\\', ':', '*', '?', '"', '<', '>', '|'], '-')
             ->trim()
-            ->limit($limit, '')
-            ->toString() ?: 'Unknown';
+            ->toString();
+        $truncated = rtrim(mb_strcut($sanitised, 0, $limit, 'UTF-8'), '. ');
+
+        return $truncated !== '' ? $truncated : 'Unknown';
     }
 }

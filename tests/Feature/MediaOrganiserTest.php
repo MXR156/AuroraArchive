@@ -64,6 +64,28 @@ it('places media without a channel ID in the orphaned folder', function () {
         ->and(File::exists($this->root.'/Videos/Orphaned/Orphaned title [ABCDEFGHIJK].mp4'))->toBeTrue();
 });
 
+it('shortens multibyte titles to a filesystem safe byte length', function () {
+    $source = $this->root.'/Recovered/Old Channel/unicode.mp4';
+    File::put($source, 'unicode video');
+    $medium = Media::query()->create([
+        'youtube_id' => 'ZD5B6qZXaLY',
+        'title' => str_repeat('𝘈𝘚𝘔𝘙 ', 40),
+        'channel_id' => 'UC80brnya4dN55bA62Q_qeHA',
+        'published_at' => '2026-07-05',
+        'original_url' => 'https://www.youtube.com/watch?v=ZD5B6qZXaLY',
+    ]);
+    $mediaFile = $medium->files()->create(['path' => 'Recovered/Old Channel/unicode.mp4']);
+
+    $stats = app(MediaOrganiser::class)->organise(write: true);
+    $filename = basename($mediaFile->refresh()->path);
+
+    expect($stats)->toMatchArray(['moved' => 1, 'failed' => 0])
+        ->and(strlen($filename))->toBeLessThanOrEqual(255)
+        ->and(mb_check_encoding($filename, 'UTF-8'))->toBeTrue()
+        ->and($filename)->toEndWith('[ZD5B6qZXaLY].mp4')
+        ->and(File::exists($this->root.'/'.$mediaFile->path))->toBeTrue();
+});
+
 it('does not overwrite a conflicting destination', function () {
     $source = $this->root.'/Recovered/Old Channel/source.mp4';
     $destination = $this->root.'/Videos/UCSTABLEID/Title [ABCDEFGHIJK].mp4';
